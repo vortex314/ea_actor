@@ -24,7 +24,7 @@ public:
 		_pswd = pswd;
 		_wifi = this;
 	}
-	virtual ~Wifi(){
+	virtual ~Wifi() {
 
 	}
 	static ActorRef create(const char* ssid, const char* pswd) {
@@ -33,6 +33,7 @@ public:
 	void init() {
 		WiFi.begin(_ssid, _pswd);
 		WiFi.onEvent(callback);
+		WiFi.setAutoConnect(true);
 	}
 
 	void onReceive(Header header, Cbor& data) {
@@ -43,6 +44,8 @@ public:
 	static void callback(WiFiEvent_t event) {
 		if (event == WIFI_EVENT_STAMODE_CONNECTED)
 			_wifi->right().tell(_wifi->self(), CONNECTED, 0);
+		if (event == WIFI_EVENT_STAMODE_DISCONNECTED)
+			_wifi->right().tell(_wifi->self(), DISCONNECTED, 0);
 	}
 
 };

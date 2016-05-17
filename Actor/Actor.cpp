@@ -106,8 +106,9 @@ void Actor::tell(Header header, Cbor& bytes) {
 			Actor::byIndex(header.dst).path());
 
 	Erc erc = _cborQueue->putf("uB", header.word, &bytes);
-	if (erc)
+	if (erc) {
 		LOGF("  >> erc : %d ", erc);
+	};
 }
 
 void Actor::tell(ActorRef src, Event event, uint8_t detail) {

@@ -25,7 +25,6 @@ public:
 	void init();
 //	void onReceive(ActorRef src, Event event, uint8_t detail, Cbor& data) ;
 	void loop();
-	static void callback(WiFiEvent_t event);
 	void onReceive(Header header, Cbor& data);
 	static ActorRef create(const char* host,uint16_t port);
 };

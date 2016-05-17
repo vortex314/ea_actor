@@ -69,7 +69,7 @@ extern "C" void setup(void) {
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx","LievenMarletteEwoutRonald");
 	tcpClient = TcpClient::create("test.mosquitto.org",1883);
-	wifi >>  ledBlinker;
+	wifi >> tcpClient >> ledBlinker;
 
 	Actor::broadcast(Actor::dummy(),INIT,0);
 

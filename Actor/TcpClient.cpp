@@ -7,8 +7,6 @@
 
 #include "TcpClient.h"
 
-
-
 TcpClient::TcpClient(const char* host, uint16_t port) :
 		Actor("TcpClient") {
 	_client = new WiFiClient();
@@ -17,19 +15,25 @@ TcpClient::TcpClient(const char* host, uint16_t port) :
 }
 
 TcpClient::~TcpClient() {
-}
-
-void TcpClient::init() {
-
-	_client->connect("test.mosquitto.org", 1883);
-}
-
-void TcpClient::onReceive(Header header,Cbor& data) {
-	if (header.event == INIT) {
-		init();
-	}
+	delete _client;
 }
 
 ActorRef TcpClient::create(const char* host, uint16_t port) {
 	return ActorRef(new TcpClient(host, port));
 }
+
+void TcpClient::init() {
+
+}
+
+void TcpClient::onReceive(Header header, Cbor& data) {
+	if (header.event == INIT) {
+		init();
+	} else if (header.event == CONNECTED) {
+		_client->connect("test.mosquitto.org", 1883);
+		right().tell(self(), CONNECTED, 0);
+//		      client.println("GET /search?q=arduino HTTP/1.0");
+//		      client.println();
+	}
+}
+
