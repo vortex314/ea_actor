@@ -29,6 +29,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1339498969" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -46,6 +47,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1109015738" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -69,6 +71,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1461950491" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -110,6 +113,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.897308332" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -127,6 +131,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.58934968" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -150,6 +155,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Common/inc"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WebServer/src"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.737304301" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>

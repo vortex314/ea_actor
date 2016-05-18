@@ -26,13 +26,14 @@ CORE_DIR ?= $(ESP_LIBS)
 # SKETCH ?= $(ESP_LIBS)/ESP8266WebServer/examples/HelloServer/HelloServer.ino
 SKETCH ?= main.cpp
 LIBS ?= $(ESP_LIBS)/Wire \
-        $(ESP_LIBS)/ESP8266WiFi \
-        $(ESP_LIBS)/ESP8266mDNS \
-        $(ESP_LIBS)/ESP8266WebServer \
-        $(ESP_LIBS)/ESP8266WiFi \
-        ./Actor \
+       ./Actor \
         ../Common/src \
         ../Common/inc 
+#       $(ESP_LIBS)/ESP8266WiFi \
+#       $(ESP_LIBS)/ESP8266mDNS \
+#       $(ESP_LIBS)/ESP8266WebServer \
+#      $(ESP_LIBS)/ESP8266WiFi \
+ 
 #        $(ESP_LIBS)/pubsubclient 
         
 # Esp8266 Arduino git location

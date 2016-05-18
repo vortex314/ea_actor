@@ -1,8 +1,8 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
+//#include <ESP8266WiFi.h>
 #include <Actor.h>
 #include <Wifi.h>
-#include <TcpClient.h>
+//#include <TcpClient.h>
 #include <LedBlinker.h>
 #include <pins_arduino.h>
 //#include <PubSubClient.h>
@@ -20,8 +20,8 @@ extern "C" void setup(void) {
 
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx","LievenMarletteEwoutRonald");
-	tcpClient = TcpClient::create("test.mosquitto.org",1883);
-	wifi >> tcpClient >> ledBlinker;
+//	tcpClient = TcpClient::create("test.mosquitto.org",1883);
+	wifi >>  ledBlinker;
 
 	Actor::broadcast(Actor::dummy(),INIT,0);
 

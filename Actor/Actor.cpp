@@ -17,6 +17,32 @@ const char* eventString(int event) {
 	return strEvent[event];
 }
 
+Header::Header(ActorRef dst, ActorRef src, Event event,
+			uint8_t detail) {
+		Header h;
+		h.dst = dst.idx();
+		h.src = src.idx();
+		h.event = event;
+		h.detail = detail;
+	}
+	Header::Header(int dst, int src, Event event, uint8_t detail) {
+		Header h;
+		h.dst = dst;
+		h.src = src;
+		h.event = event;
+		h.detail = detail;
+	}
+	bool Header::matches(Header hdr) {
+			if (hdr.dst == ANY || dst == hdr.dst) {
+				if (hdr.src == ANY || dst == hdr.dst) {
+					if (hdr.event == ANY || hdr.event == event) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
 CborQueue* Actor::_cborQueue;
 Actor* Actor::_actors[MAX_ACTORS];
 uint32_t Actor::_count = 0;
@@ -32,7 +58,7 @@ Actor& Actor::dummy() {
 }
 
 Actor::Actor(const char* path) {
-//	LOGF("ctor %s",path);
+//	LOGF("ctor %s",path);		return h;
 	_idx = _count++;
 	_actors[_idx] = this;
 	_path = path;
@@ -50,7 +76,7 @@ Actor& Actor::byIndex(uint8_t idx) {
 Actor::~Actor() {
 	_actors[_idx] = &dummy();
 }
-
+return h;
 ActorRef Actor::self() {
 	return _self;
 }
@@ -124,7 +150,7 @@ void Actor::tell(ActorRef src, Event event, uint8_t detail) {
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
 	Header w;
 	Cbor cbor(0);
-	w.dst = BROADCAST;
+	w.dst = ANY;
 	w.src = src.idx();
 	w.event = event;
 	w.detail = detail;
@@ -136,7 +162,7 @@ void Actor::eventLoop() {
 		Cbor cbor(100);
 		Header header;
 		_cborQueue->getf("uB", &header, &cbor);
-		if (header.dst == BROADCAST) {
+		if (header.dst == ANY) {
 			for (int i = 0; i < _count; i++) {
 				Actor::byIndex(i).onReceive(header, cbor);
 			}

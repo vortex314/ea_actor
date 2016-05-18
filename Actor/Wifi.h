@@ -1,53 +1,28 @@
 /*
  * Wifi.h
  *
- *  Created on: May 16, 2016
+ *  Created on: Oct 24, 2015
  *      Author: lieven
  */
 
 #ifndef WIFI_H_
 #define WIFI_H_
-
 #include "Actor.h"
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 
 class Wifi: public Actor {
+	char _ssid[32];
+	char _pswd[64];
+	uint32_t _connections;
+	static void callback();
+	static uint8_t _wifiStatus;
 private:
-	const char* _ssid;
-	const char* _pswd;
-	static Wifi* _wifi;
+	Wifi(const char* ssid, const char* pswd);
 public:
-	Wifi(const char* ssid, const char* pswd) :
-			Actor("Wifi") {
-		_ssid = ssid;
-		_pswd = pswd;
-		_wifi = this;
-	}
-	virtual ~Wifi() {
 
-	}
-	static ActorRef create(const char* ssid, const char* pswd) {
-		return ActorRef(new Wifi(ssid, pswd));
-	}
-	void init() {
-		WiFi.begin(_ssid, _pswd);
-		WiFi.onEvent(callback);
-		WiFi.setAutoConnect(true);
-	}
-
-	void onReceive(Header header, Cbor& data) {
-		if (header.event == INIT)
-			init();
-	}
-
-	static void callback(WiFiEvent_t event) {
-		if (event == WIFI_EVENT_STAMODE_CONNECTED)
-			_wifi->right().tell(_wifi->self(), CONNECTED, 0);
-		if (event == WIFI_EVENT_STAMODE_DISCONNECTED)
-			_wifi->right().tell(_wifi->self(), DISCONNECTED, 0);
-	}
-
+	virtual ~Wifi();
+	static ActorRef create(const char* ssid, const char* pswd);
+	void onReceive(Header, Cbor&);
+	void init();
 };
 
 #endif /* WIFI_H_ */
