@@ -19,11 +19,12 @@ extern "C" void setup(void) {
 	Actor::setup();
 
 	ledBlinker = LedBlinker::create(16);
-	wifi = Wifi::create("Merckx","LievenMarletteEwoutRonald");
+	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
 //	tcpClient = TcpClient::create("test.mosquitto.org",1883);
-	wifi >>  ledBlinker;
+	wifi >> ledBlinker;
+	LOGF(" sizeof(wifi) : %d", sizeof(wifi));
 
-	Actor::broadcast(Actor::dummy(),INIT,0);
+	Actor::broadcast(Actor::dummy(), INIT, 0);
 
 }
 

@@ -17,31 +17,40 @@ const char* eventString(int event) {
 	return strEvent[event];
 }
 
-Header::Header(ActorRef dst, ActorRef src, Event event,
-			uint8_t detail) {
-		Header h;
-		h.dst = dst.idx();
-		h.src = src.idx();
-		h.event = event;
-		h.detail = detail;
-	}
-	Header::Header(int dst, int src, Event event, uint8_t detail) {
-		Header h;
-		h.dst = dst;
-		h.src = src;
-		h.event = event;
-		h.detail = detail;
-	}
-	bool Header::matches(Header hdr) {
-			if (hdr.dst == ANY || dst == hdr.dst) {
-				if (hdr.src == ANY || dst == hdr.dst) {
-					if (hdr.event == ANY || hdr.event == event) {
-						return true;
-					}
-				}
+Header::Header(ActorRef dst, ActorRef src, Event event, uint8_t detail) {
+	Header h;
+	h._dst = dst.idx();
+	h._src = src.idx();
+	h._event = event;
+	h._detail = detail;
+}
+Header::Header(int dst, int src, Event event, uint8_t detail) {
+	Header h;
+	h._dst = dst;
+	h._src = src;
+	h._event = event;
+	h._detail = detail;
+}
+bool Header::matches(int dst, int src, Event event, uint8_t detail ) {
+	if (dst == ANY || dst == _dst) {
+		if (src == ANY || src == _src) {
+			if (event == ANY || event == _event) {
+				return true;
 			}
-			return false;
 		}
+	}
+	return false;
+}
+bool Header::matches(ActorRef dst, ActorRef src, Event event, uint8_t detail) {
+	if (dst.idx() == ANY || dst.idx() == _dst) {
+		if (src.idx() == ANY || src.idx() == _src) {
+			if (event == ANY || _event == event) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 CborQueue* Actor::_cborQueue;
 Actor* Actor::_actors[MAX_ACTORS];
@@ -76,28 +85,28 @@ Actor& Actor::byIndex(uint8_t idx) {
 Actor::~Actor() {
 	_actors[_idx] = &dummy();
 }
-return h;
+
 ActorRef Actor::self() {
 	return _self;
 }
 
 Header Actor::header(Actor& actor, Event event, uint8_t detail) {
 	Header header;
-	header.dst = actor.idx();
-	header.src = idx();
-	header.event = event;
-	header.detail = detail;
+	header._dst = actor.idx();
+	header._src = idx();
+	header._event = event;
+	header._detail = detail;
 	return header;
 }
 
 void Actor::onReceive(Header hdr, Cbor& data) {
-	LOGF(" Default handler event %s from %s to %s", strEvent[hdr.event],
-			ActorRef(hdr.src).path(), ActorRef(hdr.dst).path());
+	LOGF(" Default handler event %s from %s to %s", strEvent[hdr._event],
+			ActorRef(hdr._src).path(), ActorRef(hdr._dst).path());
 }
 
 void Actor::unhandled(Header hdr) {
-	LOGF(" unhandled event %s from %s to %s", strEvent[hdr.event],
-			ActorRef(hdr.src).path(), ActorRef(hdr.dst).path());
+	LOGF(" unhandled event %s from %s to %s", strEvent[hdr._event],
+			ActorRef(hdr._src).path(), ActorRef(hdr._dst).path());
 }
 
 //______________________________________________________
@@ -127,34 +136,26 @@ uint8_t Actor::idx() {
 }
 
 void Actor::tell(Header header, Cbor& bytes) {
-	LOGF(" %s >>  ( %s,%d )  >> %s", Actor::byIndex(header.src).path(),
-			strEvent[header.event], header.detail,
-			Actor::byIndex(header.dst).path());
+	LOGF(" %s >>  ( %s,%d )  >> %s", Actor::byIndex(header._src).path(),
+			strEvent[header._event], header._detail,
+			Actor::byIndex(header._dst).path());
 
-	Erc erc = _cborQueue->putf("uB", header.word, &bytes);
+	Erc erc = _cborQueue->putf("uB", header._word, &bytes);
 	if (erc) {
 		LOGF("  >> erc : %d ", erc);
 	};
 }
 
 void Actor::tell(ActorRef src, Event event, uint8_t detail) {
-	Header w;
+	Header w(self(), src,  event,  detail);
 	Cbor cbor(0);
-	w.dst = idx();
-	w.src = src.idx();
-	w.event = event;
-	w.detail = detail;
 	tell(w, cbor);
 }
 
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
-	Header w;
+	Header w(self(), ANY,  event,  detail);
 	Cbor cbor(0);
-	w.dst = ANY;
-	w.src = src.idx();
-	w.event = event;
-	w.detail = detail;
-	Erc erc = _cborQueue->putf("uB", w.word, &cbor);
+	Erc erc = _cborQueue->putf("uB", w._word, &cbor);
 }
 
 void Actor::eventLoop() {
@@ -162,14 +163,14 @@ void Actor::eventLoop() {
 		Cbor cbor(100);
 		Header header;
 		_cborQueue->getf("uB", &header, &cbor);
-		if (header.dst == ANY) {
+		if (header._dst == ANY) {
 			for (int i = 0; i < _count; i++) {
 				Actor::byIndex(i).onReceive(header, cbor);
 			}
-		} else if (header.dst < _count) {
-			Actor::byIndex(header.dst).onReceive(header, cbor);
+		} else if (header._dst < _count) {
+			Actor::byIndex(header._dst).onReceive(header, cbor);
 		} else {
-			LOGF(" invalid dst : %d", header.dst);
+			LOGF(" invalid dst : %d", header._dst);
 		}
 	};
 	for (int i = 0; i < _count; i++) {

@@ -24,9 +24,10 @@ typedef enum {
 	DISCONNECT,
 	CONNECTED,
 	DISCONNECTED,
+	ANY = 0xFF
 } Event;
 #define MAX_ACTORS 10
-#define ANY 0xFF
+//#define ANY 0xFF
 /*
  typedef union {
  struct {
@@ -46,17 +47,17 @@ class Header {
 public:
 	union {
 		struct {
-			uint8_t dst;
-			uint8_t src;
-			uint8_t event;
-			uint8_t detail;
+			uint8_t _dst;
+			uint8_t _src;
+			uint8_t _event;
+			uint8_t _detail;
 		};
-		uint32_t word;
+		uint32_t _word;
 	};
 	Header(ActorRef dst, ActorRef src, Event event, uint8_t detail);
 	Header(int dst, int src, Event event, uint8_t detail);
-	bool matches(
-			Header hdr);
+	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail);
+	bool matches(int dst, int src, Event event, uint8_t detail);
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
