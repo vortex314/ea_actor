@@ -153,7 +153,7 @@ void Actor::tell(ActorRef src, Event event, uint8_t detail) {
 }
 
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
-	Header w(self(), ANY,  event,  detail);
+	Header w(ANY,src.idx(),  event,  detail);
 	Cbor cbor(0);
 	Erc erc = _cborQueue->putf("uB", w._word, &cbor);
 }

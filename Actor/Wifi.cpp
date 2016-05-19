@@ -55,7 +55,7 @@ void Wifi::onReceive(Header hdr,Cbor& cbor) {
 	PT_BEGIN()
 	;
 	INIT: {
-		PT_WAIT_UNTIL(hdr.event==INIT);
+		PT_WAIT_UNTIL(hdr._event==INIT);
 		struct station_config stationConf;
 		int erc;
 //	ets_delay_us(300000);
@@ -129,7 +129,7 @@ void Wifi::onReceive(Header hdr,Cbor& cbor) {
 	CONNECTED: {
 		while (true) {
 			setReceiveTimeout(2000);
-			PT_YIELD_UNTIL(hdr.event==TIMEOUT);
+			PT_YIELD_UNTIL(hdr._event==TIMEOUT);
 			struct ip_info ipConfig;
 			wifi_get_ip_info(STATION_IF, &ipConfig);
 			_wifiStatus = wifi_station_get_connect_status();

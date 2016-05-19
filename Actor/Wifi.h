@@ -21,7 +21,7 @@ public:
 
 	virtual ~Wifi();
 	static ActorRef create(const char* ssid, const char* pswd);
-	void onReceive(Header, Cbor&);
+	void onReceive(Header h, Cbor& c) ;
 	void init();
 };
 

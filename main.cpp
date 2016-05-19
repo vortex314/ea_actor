@@ -2,7 +2,7 @@
 //#include <ESP8266WiFi.h>
 #include <Actor.h>
 #include <Wifi.h>
-//#include <TcpClient.h>
+#include <Tcp.h>
 #include <LedBlinker.h>
 #include <pins_arduino.h>
 //#include <PubSubClient.h>
@@ -20,7 +20,7 @@ extern "C" void setup(void) {
 
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
-//	tcpClient = TcpClient::create("test.mosquitto.org",1883);
+	tcpClient = TcpClient::create("test.mosquitto.org",1883);
 	wifi >> ledBlinker;
 	LOGF(" sizeof(wifi) : %d", sizeof(wifi));
 

@@ -487,7 +487,8 @@ WIFI_DISCONNECTED: {
 CONNECTING: {
 	while (true) {
 		connect();
-		PT_YIELD();
+		PT_YIELD()
+		;
 		if (hdr.matches(self(), self(), CONNECTED, 0)) {
 			right().tell(self(), CONNECTED, 0);
 			goto CONNECTED;
@@ -510,17 +511,17 @@ CONNECTED: {
 			right().tell(self(), DISCONNECTED, 0);
 			goto WIFI_DISCONNECTED;
 		} else if (timeout()) {
-			LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
-			if ((_lastRxd + 5000) < Sys::millis()) {
-				LOGF(" timeout - disconnect %X:%X", this, _conn);
-				disconnect();
-			}
+			//			LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
+			/*if ((_lastRxd + 5000) < Sys::millis()) {
+			 LOGF(" timeout - disconnect %X:%X", this, _conn);
+			 disconnect();
+			 }
+			 */
 		}
 	}
 }
-}
-;
 PT_END()
+;
 }
 
 TcpServer::TcpServer(uint16_t port) :
@@ -541,7 +542,6 @@ logConn(__FUNCTION__, _conn);
 _connected = true;	// to allocate TCP instance
 }
 
-
 //------------------------------------------------------------------------
 void TcpServer::listen() {
 if (espconn_accept(_conn) != ESPCONN_OK) {
@@ -556,51 +556,59 @@ PT_BEGIN()
 ;
 WIFI_DISCONNECTED: {
 while (true) {
-	PT_YIELD_UNTIL(_wifi->isConnected());
-	LOGF("TcpServer started. %x", this);
-	listen();
-	goto CONNECTING;
+	PT_YIELD()
+	;
+	if (hdr.matches(self(), left(), CONNECTED, 0)) {
+		LOGF("TcpServer started. %x", this);
+		listen();
+		goto CONNECTING;
+	}
 }
 }
 CONNECTING: {
 while (true) {
 
 	setReceiveTimeout(2000);
-	PT_YIELD_UNTIL(timeout() || msg.is(_wifi, SIG_DISCONNECTED));
-	if (_wifi->isConnected() == false)
+	PT_YIELD()
+	;
+	if (hdr.matches(self(), left(), CONNECTED, 0)) {
+		listTcp();
 		goto WIFI_DISCONNECTED;
-	listTcp();
+	}
 }
 }
 PT_END()
 }
-//-----------------------------------------------------TcpClient::TcpClient(const char* host, uint16_t port) :
-Tcp() {
-LOGF("this : %X ", this); setType(CLIENT);
-_conn = new (struct espconn);
-strcpy(_host, "");
-_remote_port = 80;
-_remote_ip.addr = 0; // should be zero for dns callback to work
-_connected = false;
-ets_memset(_conn, 0, sizeof(_conn));
-_conn->type = ESPCONN_TCP;
-_conn->state = ESPCONN_NONE;
-_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
-ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
-_connected = true;// don't reallocate master client
+//-----------------------------------------------------
+/*
+ TcpClient::TcpClient(const char* host, uint16_t port) :
+ Tcp() {
+
+ strncpy(_host, host, sizeof(_host));
+ _remote_port = port;
+ LOGF("this : %X ", this);
+ setType(CLIENT);
+ _conn = new (struct espconn);
+ strcpy(_host, "");
+ _remote_port = 80;
+ _remote_ip.addr = 0; // should be zero for dns callback to work
+ _connected = false;
+ ets_memset(_conn, 0, sizeof(_conn));
+ _conn->type = ESPCONN_TCP;
+ _conn->state = ESPCONN_NONE;
+ _conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
+ ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
+ _connected = true; // don't reallocate master client
+ }
+ */
+ActorRef TcpClient::create(const char* host, uint16_t port) {
+return ActorRef(new TcpClient(host, port));
 }
 
-void TcpClient::config(const char* host, uint16_t port) {
-strncpy(_host, host, sizeof(_host));
-_remote_port = port;
-logConn(__FUNCTION__, _conn);
-}
--------------------
-uint8_t
-StrToIP(const char* str, void *ip) {
+uint8_t StrToIP(const char* str, void *ip) {
 LOGF(" convert  Ip address : %s", str);
 int i; // The count of the number of bytes processed.
-const char * start;// A pointer to the next digit to process.
+const char * start; // A pointer to the next digit to process.
 start = str;
 
 for (i = 0; i < 4; i++) {
@@ -610,16 +618,16 @@ while (1) {
 c = *start;
 start++;
 if (c >= '0' && c <= '9') {
-n *= 10;
-n += c - '0';
+	n *= 10;
+	n += c - '0';
 }
 /* We insist on stopping at "." if we are still parsing
  the first, second, or third numbers. If we have reached
  the end of the numbers, we will allow any character. */
 else if ((i < 3 && c == '.') || i == 3) {
-break;
+	break;
 } else {
-return 0;
+	return 0;
 }
 }
 if (n >= 256) {

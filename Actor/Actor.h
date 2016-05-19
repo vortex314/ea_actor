@@ -54,6 +54,7 @@ public:
 		};
 		uint32_t _word;
 	};
+	Header() { _word=0;};
 	Header(ActorRef dst, ActorRef src, Event event, uint8_t detail);
 	Header(int dst, int src, Event event, uint8_t detail);
 	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail);

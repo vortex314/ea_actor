@@ -31,15 +31,15 @@ void LedBlinker::blink() {
 	}
 }
 void LedBlinker::onReceive(Header hdr, Cbor& data) {
-	if (hdr.event == INIT) {
+	if (hdr._event == INIT) {
 		init();
 		setReceiveTimeout(_interval);
-	} else if (hdr.event == TIMEOUT) {
+	} else if (hdr._event == TIMEOUT) {
 		blink();
 		setReceiveTimeout(_interval);
-	} else if (hdr.event == CONNECTED) {
+	} else if (hdr._event == CONNECTED) {
 		_interval = 500;
-	} else if (hdr.event == DISCONNECTED) {
+	} else if (hdr._event == DISCONNECTED) {
 		_interval = 100;
 	} else {
 		unhandled(hdr);

@@ -53,8 +53,7 @@ protected:
 	uint16_t _remote_port;
 	uint16_t _local_port;
 	struct espconn* _conn;
-	char _host[64];
-	bool _connected;
+	char _host[64];bool _connected;
 
 private:
 
@@ -116,26 +115,27 @@ public:
 	bool hasData(); //
 	bool hasSpace(); //
 //	uint8_t read(); //
-	virtual void onReceive(Header,Cbor&); //
+	virtual void onReceive(Header, Cbor&); //
 	bool isConnected(); //
 
 };
 
 class TcpServer: public Tcp {
 public:
-	TcpServer();
-	virtual void onReceive(Header,Cbor&); //
+	TcpServer(uint16_t port);
+	virtual void onReceive(Header, Cbor&); //
 	static TcpServer create(uint16_t port);
 //	Erc config(uint32_t maxConnections, uint16_t port);
 	void listen();
 };
 
 class TcpClient: public Tcp {
-	TcpClient(const char* host,uint16_t port);
+	TcpClient(const char* host, uint16_t port);
+	TcpClient();
 public:
-
-	virtual void onReceive(Header,Cbor&);
-	static TcpClient create(const char* host,uint16_t port);
+	static ActorRef create(const char* host, uint16_t port);
+	virtual void onReceive(Header, Cbor&);
+//	static TcpClient create(const char* host, uint16_t port);
 	void config(const char* host, uint16_t port);
 	void connect();
 //	void  connect(const char* host, uint16_t port);
