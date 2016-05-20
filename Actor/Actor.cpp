@@ -18,18 +18,16 @@ const char* eventString(int event) {
 }
 
 Header::Header(ActorRef dst, ActorRef src, Event event, uint8_t detail) {
-	Header h;
-	h._dst = dst.idx();
-	h._src = src.idx();
-	h._event = event;
-	h._detail = detail;
+	_dst = dst.idx();
+	_src = src.idx();
+	_event = event;
+	_detail = detail;
 }
 Header::Header(int dst, int src, Event event, uint8_t detail) {
-	Header h;
-	h._dst = dst;
-	h._src = src;
-	h._event = event;
-	h._detail = detail;
+	_dst = dst;
+	_src = src;
+	_event = event;
+	_detail = detail;
 }
 bool Header::matches(int dst, int src, Event event, uint8_t detail ) {
 	if (dst == ANY || dst == _dst) {
@@ -67,10 +65,10 @@ Actor& Actor::dummy() {
 }
 
 Actor::Actor(const char* path) {
-//	LOGF("ctor %s",path);		return h;
 	_idx = _count++;
 	_actors[_idx] = this;
 	_path = path;
+	LOGF("ctor %s %d ",_path,_idx);
 	_timeout = UINT64_MAX;
 	_left = _right = _self = ActorRef(this);
 }
@@ -155,19 +153,23 @@ void Actor::tell(ActorRef src, Event event, uint8_t detail) {
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
 	Header w(ANY,src.idx(),  event,  detail);
 	Cbor cbor(0);
+	LOGF("broacast %X",w._word);
 	Erc erc = _cborQueue->putf("uB", w._word, &cbor);
 }
 
 void Actor::eventLoop() {
 	while (_cborQueue->hasData()) {
+		LOGF("");
 		Cbor cbor(100);
 		Header header;
 		_cborQueue->getf("uB", &header, &cbor);
 		if (header._dst == ANY) {
 			for (int i = 0; i < _count; i++) {
+				LOGF(" broadcast : %d/d",i,_count);
 				Actor::byIndex(i).onReceive(header, cbor);
 			}
 		} else if (header._dst < _count) {
+			LOGF("%d",header._dst);
 			Actor::byIndex(header._dst).onReceive(header, cbor);
 		} else {
 			LOGF(" invalid dst : %d", header._dst);

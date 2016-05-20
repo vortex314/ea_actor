@@ -31,6 +31,7 @@ void LedBlinker::blink() {
 	}
 }
 void LedBlinker::onReceive(Header hdr, Cbor& data) {
+//	LOGF("");
 	if (hdr._event == INIT) {
 		init();
 		setReceiveTimeout(_interval);

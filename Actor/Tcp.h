@@ -41,7 +41,10 @@ typedef union {
 	uint32_t addr;
 	ip_addr ipAddr;
 } IpAddress;
-
+//___________________________________________________________________________________________________________
+//				GENERIC TCP connection, once setup
+//___________________________________________________________________________________________________________
+//
 class Tcp: public Actor {
 public:
 	typedef enum {
@@ -90,7 +93,6 @@ public:
 
 	void disconnect();
 
-	void registerCb(struct espconn* pconn);	//
 //	static void globalInit(Wifi* wifi, uint32_t maxConnections);
 	static Tcp* findTcp(struct espconn* pconn);
 	static void listTcp();
@@ -100,6 +102,8 @@ public:
 	void unreg();
 	uint32_t count(); //
 	uint32_t used(); //
+
+	void registerCb(struct espconn* pconn);	//
 	static void connectCb(void* arg);	//
 	static void reconnectCb(void* arg, int8 err); // mqtt_tcpclient_recon_cb(void *arg, sint8 errType)
 	static void disconnectCb(void* arg); //
@@ -119,16 +123,22 @@ public:
 	bool isConnected(); //
 
 };
-
+//_________________________________________________________________________________________________________
+//		TCP Server
+//_________________________________________________________________________________________________________
+//
 class TcpServer: public Tcp {
-public:
 	TcpServer(uint16_t port);
+public:
 	virtual void onReceive(Header, Cbor&); //
 	static TcpServer create(uint16_t port);
 //	Erc config(uint32_t maxConnections, uint16_t port);
 	void listen();
 };
-
+//_________________________________________________________________________________________________________
+//			TCP CLIENT
+//_________________________________________________________________________________________________________
+//
 class TcpClient: public Tcp {
 	TcpClient(const char* host, uint16_t port);
 	TcpClient();
