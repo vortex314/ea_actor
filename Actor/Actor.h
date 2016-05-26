@@ -13,7 +13,7 @@
 #include <CborQueue.h>
 
 typedef enum {
-	INIT,
+	INIT=0,
 	TIMEOUT,
 	STOP,
 	RESTART,
@@ -22,10 +22,11 @@ typedef enum {
 	RXD,
 	CONNECT,
 	DISCONNECT,
-	CONNECTED,
-	DISCONNECTED,
+	ADD_LISTENER,
+	RESPONSE = 0x80,
 	ANY = 0xFF
 } Event;
+#define REPLY(xxx) (xxx + RESPONSE)
 #define MAX_ACTORS 10
 //#define ANY 0xFF
 /*
@@ -59,6 +60,7 @@ public:
 	Header(int dst, int src, Event event, uint8_t detail);
 	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail);
 	bool matches(int dst, int src, Event event, uint8_t detail);
+	bool is(uint8_t event,uint8_t detail);
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
@@ -113,7 +115,9 @@ public:
 	Actor& actor();
 	~ActorRef();
 	void tell(Header header, Cbor& data);
-	void forward(Header header, Cbor& data);
+	void forward(Header header, Cbor& data); // handle by another onReceive, keep header
+	void delegate(Header header, Cbor& data); // handle by another onReceive, keep header
+	void route(Header,Cbor&); // change destination and put back on queue
 	void tell(ActorRef src, Event event, uint8_t detail);
 	ActorRef operator>>(ActorRef ref);
 	uint8_t idx() {

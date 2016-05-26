@@ -38,9 +38,9 @@ void LedBlinker::onReceive(Header hdr, Cbor& data) {
 	} else if (hdr._event == TIMEOUT) {
 		blink();
 		setReceiveTimeout(_interval);
-	} else if (hdr._event == CONNECTED) {
+	} else if (hdr._event == REPLY(CONNECT)) {
 		_interval = 500;
-	} else if (hdr._event == DISCONNECTED) {
+	} else if (hdr._event == REPLY(DISCONNECT)) {
 		_interval = 100;
 	} else {
 		unhandled(hdr);

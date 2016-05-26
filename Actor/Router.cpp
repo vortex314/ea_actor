@@ -9,12 +9,6 @@
 #include <Logger.h>
 #include <CborQueue.h>
 #include <Arduino.h>
-#include <stdio.h>
-#ifndef UINT64_MAX
-#define UINT64_MAX 0xFFFFFFFFFFFFFFFFL
-#endif
-#define LOGF(fmt,...)
-//#define LOGF(fmt,...) printf("%s:%s ",__FILE__,__FUNCTION__ );vprintf(fmt,##__VA_ARGS__);printf("\n");
 
 const char*strEvent[] = { "INIT", "TIMEOUT", "STOP", "RESTART", "CONFIG", "TXD",
 		"RXD", "CONNECT", "DISCONNECT", "CONNECTED", "DISCONNECTED" };
@@ -24,16 +18,18 @@ const char* eventString(int event) {
 }
 
 Header::Header(ActorRef dst, ActorRef src, Event event, uint8_t detail) {
-	_dst = dst.idx();
-	_src = src.idx();
-	_event = event;
-	_detail = detail;
+	Header h;
+	h._dst = dst.idx();
+	h._src = src.idx();
+	h._event = event;
+	h._detail = detail;
 }
 Header::Header(int dst, int src, Event event, uint8_t detail) {
-	_dst = dst;
-	_src = src;
-	_event = event;
-	_detail = detail;
+	Header h;
+	h._dst = dst;
+	h._src = src;
+	h._event = event;
+	h._detail = detail;
 }
 bool Header::matches(int dst, int src, Event event, uint8_t detail ) {
 	if (dst == ANY || dst == _dst) {
@@ -71,10 +67,10 @@ Actor& Actor::dummy() {
 }
 
 Actor::Actor(const char* path) {
+//	LOGF("ctor %s",path);		return h;
 	_idx = _count++;
 	_actors[_idx] = this;
 	_path = path;
-	LOGF("ctor %s %d ",_path,_idx);
 	_timeout = UINT64_MAX;
 	_left = _right = _self = ActorRef(this);
 }
@@ -159,32 +155,25 @@ void Actor::tell(ActorRef src, Event event, uint8_t detail) {
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
 	Header w(ANY,src.idx(),  event,  detail);
 	Cbor cbor(0);
-	LOGF("broacast %X",w._word);
 	Erc erc = _cborQueue->putf("uB", w._word, &cbor);
-	if ( erc ) {
-		LOGF(" cborQueue put failed : %d ",erc);
-	}
 }
 
 void Actor::eventLoop() {
 	while (_cborQueue->hasData()) {
-		LOGF("");
 		Cbor cbor(100);
 		Header header;
 		_cborQueue->getf("uB", &header, &cbor);
 		if (header._dst == ANY) {
-			for (uint32_t i = 0; i < _count; i++) {
-				LOGF(" broadcast : %d/d",i,_count);
+			for (int i = 0; i < _count; i++) {
 				Actor::byIndex(i).onReceive(header, cbor);
 			}
 		} else if (header._dst < _count) {
-			LOGF("%d",header._dst);
 			Actor::byIndex(header._dst).onReceive(header, cbor);
 		} else {
 			LOGF(" invalid dst : %d", header._dst);
 		}
 	};
-	for (uint32_t i = 0; i < _count; i++) {
+	for (int i = 0; i < _count; i++) {
 		Actor* actor = _actors[i];
 		if (actor == 0) {
 			break;
@@ -195,7 +184,7 @@ void Actor::eventLoop() {
 			}
 		}
 	}
-	for (uint32_t i = 0; i < _count; i++) {
+	for (int i = 0; i < _count; i++) {
 		Actor* actor = Actor::_actors[i];
 		actor->poll();
 	}
@@ -232,9 +221,6 @@ bool ActorRef::equal(ActorRef ref) {
 
 void ActorRef::tell(Header header, Cbor& data) {
 	actor().tell(header, data);
-}
-void ActorRef::forward(Header header, Cbor& data){
-	actor().onReceive(header,data);
 }
 void ActorRef::tell(ActorRef src, Event event, uint8_t detail) {
 	actor().tell(src, event, detail);
