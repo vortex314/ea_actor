@@ -7,8 +7,14 @@
 
 #include <Mqtt.h>
 #include <MqttConstants.h>
+#include <MqttMsg.h>
 
+#include <stdio.h>
 
+Mqtt::Mqtt(const char *host, uint16_t port) :
+		Actor("Mqtt") {
+
+}
 
 Mqtt::~Mqtt() {
 	// TODO Auto-generated destructor stub
@@ -66,21 +72,34 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 	}
 }
 #define MQTT_TIME_RECONNECT 3000
+
+MqttConnector::MqttConnector(const char* host, uint16_t port) : Actor("MqttConnector"),
+		_host(host), _port(port) {
+	sprintf(_clientId, "ESP%X", system_get_chip_id());
+}
+
 void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
-	PT_BEGIN();
+	PT_BEGIN()
+	;
 	DISCONNECTED: {
 		while (true) {
 			if (hdr.is(REPLY(CONNECT), E_OK))
 				goto CONNECTED;
 			setReceiveTimeout(MQTT_TIME_RECONNECT);
-			_mqtt.tell(Header(_mqtt,_mqtt,TXD,0),connectMsg);
-			PT_YIELD();
+			MqttMsg connectMsg(100);
+			connectMsg.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
+					online.c_str(), cbor, "", "", TIME_KEEP_ALIVE / 1000);
+			_mqtt.tell(Header(_mqtt, _mqtt, TXD, 0), connectMsg);
+			PT_YIELD()
+			;
 		}
-	};
-	CONNECTED :{
-		while(true) {
+	}
+	;
+	CONNECTED: {
+		while (true) {
 
 		}
 	}
-	PT_END();
+PT_END()
+;
 }

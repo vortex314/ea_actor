@@ -20,22 +20,22 @@ const char* const QosNames[] = { "QOS0", "QOS1", "QOS2" };
 
 Str logLine(300);
 
-IROM MqttMsg::MqttMsg(uint32_t size) :
+ MqttMsg::MqttMsg(uint32_t size) :
 		Bytes(size), _prefix(30), _message(0), _topic(0), _user(0), _password(
 				0), _clientId(0) {
 }
 
-void IROM MqttMsg::prefix(Str& prefix) {
+void  MqttMsg::prefix(Str& prefix) {
 	_prefix.clear();
 	_prefix << prefix;
 }
 
-void IROM MqttMsg::addHeader(int hdr) {
+void  MqttMsg::addHeader(int hdr) {
 	clear();
 	write(hdr);
 }
 
-void IROM MqttMsg::addRemainingLength(uint32_t length) {
+void  MqttMsg::addRemainingLength(uint32_t length) {
 	do {
 		uint8_t digit = length & 0x7F;
 		length /= 128;
@@ -46,45 +46,45 @@ void IROM MqttMsg::addRemainingLength(uint32_t length) {
 	} while (length > 0);
 }
 
-void IROM MqttMsg::addUint16(uint16_t value) {
+void  MqttMsg::addUint16(uint16_t value) {
 	write(value >> 8);
 	write(value & 0xFF);
 }
 
-void IROM MqttMsg::addString(const char *str) {
+void  MqttMsg::addString(const char *str) {
 	addUint16(strlen(str));
 	addBytes((uint8_t*) str, strlen(str));
 }
 
-void IROM MqttMsg::addStr(Str& str) {
+void  MqttMsg::addStr(Str& str) {
 	addUint16(str.length());
 	addBytes(str);
 }
 
-void IROM MqttMsg::addComposedString(Str& prefix, Str &str) {
+void  MqttMsg::addComposedString(Str& prefix, Str &str) {
 	addUint16(prefix.length() + str.length());
 	addBytes(prefix);
 	addBytes(str);
 }
 
-void IROM MqttMsg::addMessage(uint8_t* src, uint32_t length) {
+void  MqttMsg::addMessage(uint8_t* src, uint32_t length) {
 	addUint16(length);
 	addBytes(src, length);
 }
 
-void IROM MqttMsg::addBytes(Bytes& bytes) {
+void  MqttMsg::addBytes(Bytes& bytes) {
 	bytes.offset(0);
 	for (uint32_t i = 0; i < bytes.length(); i++)
 		write(bytes.read());
 }
 
-void IROM MqttMsg::addBytes(uint8_t* bytes, uint32_t length) {
+void  MqttMsg::addBytes(uint8_t* bytes, uint32_t length) {
 	for (uint32_t i = 0; i < length; i++)
 		write(*bytes++);
 }
 #define MQTT_VERSION 0x04
 
-void IROM MqttMsg::Connect(uint8_t hdr, const char *clientId,
+void  MqttMsg::Connect(uint8_t hdr, const char *clientId,
 		uint8_t connectFlag, const char *willTopic, Bytes& willMsg,
 		const char *username, const char* password, uint16_t keepAlive) {
 
@@ -135,7 +135,7 @@ void IROM MqttMsg::Connect(uint8_t hdr, const char *clientId,
 	}
 }
 
-void IROM MqttMsg::Publish(uint8_t hdr, Str& topic, Bytes& msg,
+void  MqttMsg::Publish(uint8_t hdr, Str& topic, Bytes& msg,
 		uint16_t messageId) {
 //	LOG("PUBLISH");
 	addHeader(MQTT_MSG_PUBLISH + hdr);
@@ -153,7 +153,7 @@ void IROM MqttMsg::Publish(uint8_t hdr, Str& topic, Bytes& msg,
 	addBytes(msg);
 }
 
-void IROM MqttMsg::ConnAck(uint8_t erc) {
+void  MqttMsg::ConnAck(uint8_t erc) {
 //   LOG("CONNACK");
 	addHeader(MQTT_MSG_CONNACK);
 	addRemainingLength(2);
@@ -161,41 +161,41 @@ void IROM MqttMsg::ConnAck(uint8_t erc) {
 	write(erc);
 }
 
-void IROM MqttMsg::Disconnect() {
+void  MqttMsg::Disconnect() {
 //    LOG("DISCONNECT");
 	addHeader(MQTT_MSG_DISCONNECT);
 	addRemainingLength(0);
 }
 
-void IROM MqttMsg::PubRel(uint16_t messageId) {
+void  MqttMsg::PubRel(uint16_t messageId) {
 //    LOG("PUBREL");
 	addHeader(MQTT_MSG_PUBREL | MQTT_QOS1_FLAG);
 	addRemainingLength(2);
 	addUint16(messageId);
 }
 
-void IROM MqttMsg::PubAck(uint16_t messageId) {
+void  MqttMsg::PubAck(uint16_t messageId) {
 //    LOG("PUBACK");
 	addHeader(MQTT_MSG_PUBACK | MQTT_QOS1_FLAG);
 	addRemainingLength(2);
 	addUint16(messageId);
 }
 
-void IROM MqttMsg::PubRec(uint16_t messageId) {
+void  MqttMsg::PubRec(uint16_t messageId) {
 //    LOG("PUBREC");
 	addHeader(MQTT_MSG_PUBREC | MQTT_QOS1_FLAG);
 	addRemainingLength(2);
 	addUint16(messageId);
 }
 
-void IROM MqttMsg::PubComp(uint16_t messageId) {
+void  MqttMsg::PubComp(uint16_t messageId) {
 //    LOG("PUBCOMP");
 	addHeader(MQTT_MSG_PUBCOMP | MQTT_QOS1_FLAG);
 	addRemainingLength(2);
 	addUint16(messageId);
 }
 
-void IROM MqttMsg::Subscribe(Str& topic, uint16_t messageId,
+void  MqttMsg::Subscribe(Str& topic, uint16_t messageId,
 		uint8_t requestedQos) {
 //	LOG("SUBSCRIBE");
 	addHeader(MQTT_QOS1_FLAG | MQTT_MSG_SUBSCRIBE);
@@ -205,19 +205,19 @@ void IROM MqttMsg::Subscribe(Str& topic, uint16_t messageId,
 	write(requestedQos);
 }
 
-void IROM MqttMsg::PingReq() {
+void  MqttMsg::PingReq() {
 //    LOG("PINGREQ");
 	addHeader(MQTT_MSG_PINGREQ); // Message Type, DUP flag, QoS level, Retain
 	addRemainingLength(0); // Remaining length
 }
 
-void IROM MqttMsg::PingResp() {
+void  MqttMsg::PingResp() {
 // LOG("PINGRESP");
 	addHeader(MQTT_MSG_PINGRESP); // Message Type, DUP flag, QoS level, Retain
 	addRemainingLength(0); // Remaining length
 }
 
-void IROM MqttMsg::reset() {
+void  MqttMsg::reset() {
 	_recvState = ST_HEADER;
 	clear();
 	_remainingLength = 0;
@@ -229,27 +229,27 @@ void IROM MqttMsg::reset() {
 	_messageId = 1;
 }
 
-uint8_t IROM MqttMsg::type() {
+uint8_t  MqttMsg::type() {
 	return _header & MQTT_TYPE_MASK;
 }
 
-uint8_t IROM MqttMsg::qos() {
+uint8_t  MqttMsg::qos() {
 	return _header & MQTT_QOS_MASK;
 }
 
-uint16_t IROM MqttMsg::messageId() {
+uint16_t  MqttMsg::messageId() {
 	return _messageId;
 }
 
-Str* IROM MqttMsg::topic() {
+Str*  MqttMsg::topic() {
 	return &_topic;
 }
 
-Bytes* IROM MqttMsg::message() {
+Bytes*  MqttMsg::message() {
 	return &_message;
 }
 
-bool IROM MqttMsg::feed(uint8_t data) {
+bool  MqttMsg::feed(uint8_t data) {
 	write(data);
 	if (_recvState == ST_HEADER) {
 		_header = data;
@@ -276,28 +276,28 @@ bool IROM MqttMsg::feed(uint8_t data) {
 	return _recvState == ST_COMPLETE;
 }
 
-bool IROM MqttMsg::complete() {
+bool  MqttMsg::complete() {
 	return (_recvState == ST_COMPLETE);
 }
 
-void IROM MqttMsg::complete(bool b) {
+void  MqttMsg::complete(bool b) {
 	if (b)
 		_recvState = ST_COMPLETE;
 }
 
-void IROM MqttMsg::readUint16(uint16_t* pi) {
+void  MqttMsg::readUint16(uint16_t* pi) {
 	*pi = read() << 8;
 	*pi += read();
 }
 
-void IROM MqttMsg::mapUtfStr(Str& str) {
+void  MqttMsg::mapUtfStr(Str& str) {
 	uint16_t l;
 	readUint16(&l);
 	str.map(data() + offset(), l);
 	move(l);
 }
 
-void IROM MqttMsg::readBytes(Bytes* b, int length) {
+void  MqttMsg::readBytes(Bytes* b, int length) {
 	int i;
 	b->clear();
 	for (i = 0; i < length; i++) {
@@ -305,13 +305,13 @@ void IROM MqttMsg::readBytes(Bytes* b, int length) {
 	}
 }
 
-bool IROM MqttMsg::calcLength(uint8_t data) {
+bool  MqttMsg::calcLength(uint8_t data) {
 	_remainingLength <<= 7;
 	_remainingLength += (data & 0x7F);
 	return (data & 0x80);
 }
 
-const char* IROM MqttMsg::toString(Str& str) {
+const char*  MqttMsg::toString(Str& str) {
 	parse();
 	str.clear() << '{' << MqttNames[type() >> 4] << "+"
 			<< QosNames[(_header & MQTT_QOS_MASK) >> 1];
@@ -338,7 +338,7 @@ const char* IROM MqttMsg::toString(Str& str) {
 	return str.c_str();
 }
 
-bool IROM MqttMsg::parse() {
+bool  MqttMsg::parse() {
 	if (length() < 2) {
 		WARN("length :%d", length());
 		return false;

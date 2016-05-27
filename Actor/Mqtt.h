@@ -8,6 +8,8 @@
 #ifndef MQTT_H_
 #define MQTT_H_
 #include <Actor.h>
+#include <MqttMsg.h>
+#include <MqttConstants.h>
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
  * OUT : TXD(MQTT_PING),CONNECT
@@ -42,8 +44,9 @@ public:
 class MqttConnector : public Actor {
 	const char* _host;
 	const uint16_t _port;
+	const char* _clientId;
 	ActorRef _mqtt;
-	MqttConnector();
+	MqttConnector(const char* host, uint16_t port);
 public:
 	static ActorRef create(ActorRef mqtt,const char* host, uint16_t port);
 	void onReceive(Header,Cbor&);
@@ -72,5 +75,8 @@ public:
 	static ActorRef create(ActorRef mqtt);
 	void onReceive(Header,Cbor&);
 };
+
+extern MqttMsg mqttIn;
+extern MqttMsg mqttOut;
 
 #endif /* MQTT_H_ */

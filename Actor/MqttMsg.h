@@ -8,6 +8,7 @@
 #ifndef MQTTMSG_H_
 #define MQTTMSG_H_
 #include "MqttConstants.h"
+#include <Bytes.h>
 
 enum MqttField {
 	KEY_HEADER, KEY_TOPIC, KEY_MESSAGE, KEY_CLIENT, KEY_USER, KEY_PASSWORD,
