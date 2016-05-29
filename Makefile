@@ -19,7 +19,7 @@
 
 #=== Project specific definitions: sketch and list of needed libraries
 ESP_LIBS ?= /home/lieven/workspace/Arduino/libraries
-INCLUDE_DIRS ?= ../Common/inc . ./Actor
+INCLUDE_DIRS ?= ../Common/inc . ./Actor ./esp8266
 CORE_DIR ?= $(ESP_LIBS)
 # USER_DIRS ?= $(ESP_LIBS)
 # LIBS ?= .

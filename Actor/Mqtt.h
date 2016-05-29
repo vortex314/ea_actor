@@ -10,6 +10,8 @@
 #include <Actor.h>
 #include <MqttMsg.h>
 #include <MqttConstants.h>
+
+#define TIME_KEEP_ALIVE 5000
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
  * OUT : TXD(MQTT_PING),CONNECT
@@ -42,13 +44,11 @@ public:
  * OUT : TXD(MQTT_CONNECT),CONNECT
  */
 class MqttConnector : public Actor {
-	const char* _host;
-	const uint16_t _port;
 	const char* _clientId;
 	ActorRef _mqtt;
-	MqttConnector(const char* host, uint16_t port);
+	MqttConnector(ActorRef mqtt);
 public:
-	static ActorRef create(ActorRef mqtt,const char* host, uint16_t port);
+	static ActorRef create(ActorRef mqtt);
 	void onReceive(Header,Cbor&);
 };
 /*

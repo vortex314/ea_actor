@@ -24,11 +24,4 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>Actor/Actor</name>
-			<type>2</type>
-			<location>C:/Data/lieven/workspace/ea_actor/Actor</location>
-		</link>
-	</linkedResources>
 </projectDescription>

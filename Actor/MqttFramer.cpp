@@ -8,7 +8,7 @@
 #include "MqttFramer.h"
 
 IROM MqttFramer::MqttFramer(Tcp* stream) :
-		Handler("MqttFrame") {
+		Actor("MqttFrame") {
 	_msg = new MqttMsg(256);
 	_msg->reset();
 	_stream = stream;
@@ -36,15 +36,15 @@ IROM void MqttFramer::disconnect() {
 
 uint32_t msgCount=0;
 
-IROM bool MqttFramer::dispatch(Msg& msg) {
+void MqttFramer::onReceive(Header hdr,Cbor& cbor) {
 	PT_BEGIN()
 	while (true) {
-		PT_YIELD_UNTIL(msg.is(_stream, SIG_ALL));
+		PT_YIELD_UNTIL(hdr.is(INIT,ANY));
 
-		switch (msg.signal()) {
-		case SIG_RXD: {
+		switch (hdr._event) {
+		case RXD: {
 //			INFO(" data rxd");
-			int i = 0;
+/*			int i = 0;
 			while (_stream->hasData()) {
 				i++;
 				if (_msg->feed(_stream->read())) {
@@ -63,16 +63,15 @@ IROM bool MqttFramer::dispatch(Msg& msg) {
 //					Msg::publish(this, SIG_RXD, _msg->type());
 					_msg->reset();
 				}
-			}
+			}*/
 //			INFO("Received %d bytes",i);
 			break;
 		}
 		default: {
-			Msg::publish(this, msg.signal());
+			unhandled(hdr);
 			break;
 		}
 		}
 	}
 	PT_END();
-	return false;
 }

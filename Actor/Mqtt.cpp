@@ -8,16 +8,30 @@
 #include <Mqtt.h>
 #include <MqttConstants.h>
 #include <MqttMsg.h>
-
+#include <espmissingincludes.h>
 #include <stdio.h>
+extern "C" {
+#include <user_interface.h>
+}
+
+MqttMsg mqttIn(256);
+MqttMsg mqttOut(256);
 
 Mqtt::Mqtt(const char *host, uint16_t port) :
 		Actor("Mqtt") {
+	_connector = MqttConnector::create(self());
+	_publisher = ActorRef::dummy();
+	_subscriber = ActorRef::dummy();
+	_pinger = ActorRef::dummy();
 
 }
 
 Mqtt::~Mqtt() {
 	// TODO Auto-generated destructor stub
+}
+
+ActorRef Mqtt::create(const char* host, uint16_t port) {
+	return ActorRef(new Mqtt(host, port));
 }
 /*
  * #define MQTT_MSG_CONNECT       	(1<<4)
@@ -68,38 +82,51 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 	} else if (hdr.is(REPLY(CONNECT), ANY)) {
 		_connector.delegate(hdr, cbor);
 	} else if (hdr.is(TXD, ANY)) {
-		_framer.delegate(hdr, cbor);
+		left().delegate(hdr, cbor);
 	}
 }
 #define MQTT_TIME_RECONNECT 3000
 
-MqttConnector::MqttConnector(const char* host, uint16_t port) : Actor("MqttConnector"),
-		_host(host), _port(port) {
-	sprintf(_clientId, "ESP%X", system_get_chip_id());
+MqttConnector::MqttConnector(ActorRef mqtt) :
+		Actor("MqttConnector"), _clientId("nocl") {
+	_mqtt = mqtt;
+	sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
 }
 
+ActorRef MqttConnector::create(ActorRef mqtt) {
+	return ActorRef(new MqttConnector(mqtt));
+}
+Cbor out(256);
 void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
+	Str onlineFalse("false");
 	PT_BEGIN()
-	;
+	if (hdr.is(INIT, E_OK)) {
+		goto DISCONNECTED;
+	}
 	DISCONNECTED: {
 		while (true) {
-			if (hdr.is(REPLY(CONNECT), E_OK))
-				goto CONNECTED;
-			setReceiveTimeout(MQTT_TIME_RECONNECT);
-			MqttMsg connectMsg(100);
-			connectMsg.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
-					online.c_str(), cbor, "", "", TIME_KEEP_ALIVE / 1000);
-			_mqtt.tell(Header(_mqtt, _mqtt, TXD, 0), connectMsg);
 			PT_YIELD()
 			;
+			if (hdr.is(REPLY(CONNECT), E_OK))
+				goto CONNECTED;
 		}
 	}
-	;
 	CONNECTED: {
 		while (true) {
+			setReceiveTimeout(MQTT_TIME_RECONNECT);
 
+			mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
+					"system/alive", onlineFalse, "", "",
+					TIME_KEEP_ALIVE / 1000);
+
+			out.clear();
+			out.add(mqttOut);
+			_mqtt.tell(Header(_mqtt, _mqtt, TXD, 0),  out);
+			PT_YIELD()
+			;
+			if (hdr.is(REPLY(DISCONNECT), E_OK))
+				goto DISCONNECTED;
 		}
 	}
 PT_END()
-;
 }

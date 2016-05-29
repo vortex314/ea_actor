@@ -3,6 +3,7 @@
 #include <Actor.h>
 #include <Wifi.h>
 #include <Tcp.h>
+#include <Mqtt.h>
 #include <LedBlinker.h>
 #include <pins_arduino.h>
 //#include <PubSubClient.h>
@@ -10,6 +11,7 @@
 ActorRef ledBlinker;
 ActorRef tcpClient;
 ActorRef wifi;
+ActorRef mqtt;
 
 extern "C" void setup(void) {
 	Serial.begin(115200);
@@ -21,8 +23,10 @@ extern "C" void setup(void) {
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
 	tcpClient = TcpClient::create("test.mosquitto.org",1883);
-	wifi >> ledBlinker;
-	LOGF(" sizeof(wifi) : %d", sizeof(wifi));
+	mqtt = Mqtt::create("test.mosquitto.org",1883);
+//	wifi >> ledBlinker;
+
+	wifi >> tcpClient >> mqtt >> ledBlinker;
 
 	Actor::broadcast(Actor::dummy(), INIT, 0);
 

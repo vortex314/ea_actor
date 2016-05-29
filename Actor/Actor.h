@@ -13,7 +13,7 @@
 #include <CborQueue.h>
 
 typedef enum {
-	INIT=0,
+	INIT = 0,
 	TIMEOUT,
 	STOP,
 	RESTART,
@@ -26,7 +26,7 @@ typedef enum {
 	RESPONSE = 0x80,
 	ANY = 0xFF
 } Event;
-#define REPLY(xxx) (xxx + RESPONSE)
+#define REPLY(xxx) (Event)(xxx + RESPONSE)
 #define MAX_ACTORS 10
 //#define ANY 0xFF
 /*
@@ -55,12 +55,15 @@ public:
 		};
 		uint32_t _word;
 	};
-	Header() { _word=0;};
+	Header() {
+		_word = 0;
+	}
+	;
 	Header(ActorRef dst, ActorRef src, Event event, uint8_t detail);
-	Header(int dst, int src, Event event, uint8_t detail);
-	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail);
-	bool matches(int dst, int src, Event event, uint8_t detail);
-	bool is(uint8_t event,uint8_t detail);
+	Header(int dst, int src, Event event, uint8_t detail);bool matches(
+			ActorRef dst, ActorRef src, Event event, uint8_t detail);bool matches(
+			int dst, int src, Event event, uint8_t detail);bool is(
+			uint8_t event, uint8_t detail);
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
@@ -117,7 +120,7 @@ public:
 	void tell(Header header, Cbor& data);
 	void forward(Header header, Cbor& data); // handle by another onReceive, keep header
 	void delegate(Header header, Cbor& data); // handle by another onReceive, keep header
-	void route(Header,Cbor&); // change destination and put back on queue
+	void route(Header, Cbor&); // change destination and put back on queue
 	void tell(ActorRef src, Event event, uint8_t detail);
 	ActorRef operator>>(ActorRef ref);
 	uint8_t idx() {
@@ -125,6 +128,9 @@ public:
 	}
 	bool equal(ActorRef ref);
 	const char* path();
+	static ActorRef dummy() {
+		return ActorRef(0);
+	}
 };
 
 class Actor {
@@ -141,11 +147,15 @@ private:
 	static CborQueue* _cborQueue;
 protected:
 	LineNumber _ptLine;
+	static const char* eventToString(uint8_t event);
+	static const char* idxToPath(uint8_t idx);
+	static void logHeader(Header);
 public:
 	Actor(const char* name);
 	virtual ~Actor();
 	ActorRef self();
 	static void link(ActorRef left, ActorRef right);
+	void tellf(Header hdr,const char* fmt,...);
 	void tell(Header header, Cbor& data);
 	void tell(ActorRef src, Event event, uint8_t detail);
 	static Actor& byIndex(uint8_t idx);

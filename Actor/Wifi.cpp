@@ -52,6 +52,7 @@ uint8_t Wifi::_wifiStatus = STATION_IDLE;
 void Wifi::onReceive(Header hdr,Cbor& cbor) {
 //	LOGF("line : %d ",_ptLine);
 // LOGF("msg : %d:%d",msg.src(),msg.signal());
+//	LOGF(" Heap size : %d", system_get_free_heap_size());
 	PT_BEGIN()
 	;
 	INIT: {
@@ -104,7 +105,7 @@ void Wifi::onReceive(Header hdr,Cbor& cbor) {
 							== STATION_WRONG_PASSWORD
 					|| wifi_station_get_connect_status()
 							== STATION_CONNECT_FAIL) {
-//				LOGF("NOT CONNECTED");
+				LOGF("NOT CONNECTED");
 				wifi_station_connect();
 			} else if (_wifiStatus == STATION_GOT_IP && ipConfig.ip.addr != 0) {
 				_connections++;
@@ -116,7 +117,7 @@ void Wifi::onReceive(Header hdr,Cbor& cbor) {
 				LOGF("IP Address : %d.%d.%d.%d", v.ip[0], v.ip[1], v.ip[2],
 						v.ip[3]);
 //				LOGF("CONNECTED");
-				right().tell(self(), CONNECTED,0);
+				right().tell(self(), REPLY(CONNECT),0);
 
 				goto CONNECTED;
 			} else {
@@ -134,7 +135,7 @@ void Wifi::onReceive(Header hdr,Cbor& cbor) {
 			wifi_get_ip_info(STATION_IF, &ipConfig);
 			_wifiStatus = wifi_station_get_connect_status();
 			if (_wifiStatus != STATION_GOT_IP) {
-				right().tell(self(), DISCONNECTED,0);
+				right().tell(self(), REPLY(DISCONNECT),0);
 				LOGF("DISCONNECTED");
 				goto DISCONNECTED;
 			}

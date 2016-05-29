@@ -7,7 +7,7 @@
 
 #include "Tcp.h"
 #include <string.h>
-#include <Logger.h>
+//#include <Logger.h>
 
 //uint32_t Tcp::_maxConnections = 5;
 Tcp* Tcp::_first = 0;
@@ -183,7 +183,7 @@ Erc Tcp::write(uint8_t* pb, uint32_t length) {
 	};
 	if (i < length) {
 		_overflowTxd++;
-		ERROR("TCP BUFFER OVERFLOW");
+		LOGF("TCP BUFFER OVERFLOW");
 	}
 	send();
 	return E_OK;
@@ -232,7 +232,7 @@ void Tcp::connectCb(void* arg) {
 		espconn_set_keepalive(pconn, ESPCONN_KEEPIDLE, (void*) 1);
 		espconn_regist_time(pconn, 100, 0);
 
-		pTcp->self().tell(pTcp->self(), CONNECTED, 0);
+		pTcp->self().tell(pTcp->self(), REPLY(CONNECT), 0);
 		pTcp->_connected = true;
 		pTcp->_lastRxd = Sys::millis();
 	} else {
@@ -253,7 +253,7 @@ void Tcp::reconnectCb(void* arg, int8_t err) {
 	return;
 
 	LOGF("TCP: Reconnect %s:%d err : %d", pTcp->_host, pTcp->_remote_port, err);
-	pTcp->right().tell(pTcp->self(), DISCONNECTED, 0);
+	pTcp->right().tell(pTcp->self(), REPLY(DISCONNECT), 0);
 	pTcp->_connected = false;
 }
 
@@ -267,7 +267,7 @@ void Tcp::disconnectCb(void* arg) {
 		if (pTcp->getType() == LIVE) {
 			pTcp->loadEspconn(0);
 		}
-		pTcp->self().tell(pTcp->self(), DISCONNECTED, 0);
+		pTcp->self().tell(pTcp->self(), REPLY(DISCONNECT), 0);
 	} else
 		LOGF("connection not found");
 	return;
@@ -307,7 +307,7 @@ void Tcp::writeFinishCb(void* arg) {
 
 void Tcp::sendCb(void *arg) {
 	struct espconn* pconn = (struct espconn*) arg;
-//	Tcp *pTcp = getInstance(pconn);
+//	Tcp *pTcp = getInstance(pconn);not
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
 	pTcp->send();
@@ -362,33 +362,6 @@ void Tcp::dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg) {
 //	}
 }
 
-//____________________________________________________________
-//			Tcp::connect
-//____________________________________________________________
-void TcpClient::connect() {
-
-	LOGF(" Connecting ");
-//	ets_memset(_conn, 0, sizeof(_conn));
-	_conn->type = ESPCONN_TCP;
-	_conn->state = ESPCONN_NONE;
-//	_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
-	ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
-	_conn->proto.tcp->local_port = espconn_port();
-	_conn->proto.tcp->remote_port = _remote_port;
-	_conn->reverse = this;
-	registerCb(_conn);
-
-	if (StrToIP(_host, _conn->proto.tcp->remote_ip)) {
-		LOGF("TCP: Connect to ip  %s:%d", _host, _remote_port);
-		espconn_connect(_conn);
-	} else {
-		LOGF("TCP: Connect to domain %s:%d", _host, _remote_port);
-		espconn_gethostbyname(_conn, _host, &_remote_ip.ipAddr,
-				Tcp::dnsFoundCb);
-	}
-	LOGF(" Heap size : %d", system_get_free_heap_size());
-}
-
 void Tcp::disconnect() {
 	espconn_disconnect(_conn);
 	_connected = false;
@@ -409,7 +382,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 	;
 	WIFI_DISCONNECTED: {
 		while (true) {
-			PT_YIELD_UNTIL(hdr.matches(left(), self(), CONNECTED, ANY));
+			PT_YIELD_UNTIL(hdr.matches(left(), self(), REPLY(CONNECT), ANY));
 			LOGF("Tcp started. %x", this);
 			goto CONNECTING;
 		}
@@ -418,11 +391,11 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		while (true) {
 			PT_YIELD()
 			;
-			if (hdr.matches(self(), self(), CONNECTED, 0)) {
-				right().tell(self(), CONNECTED, 0);
+			if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
+				right().tell(self(), REPLY(CONNECT), 0);
 				goto CONNECTED;
-			} else if (hdr.matches(self(), self(), DISCONNECTED, 0)) {
-				right().tell(self(), DISCONNECTED, 0);
+			} else if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {
+				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto WIFI_DISCONNECTED;
 			}
 		}
@@ -432,11 +405,11 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 			setReceiveTimeout(5000);
 			PT_YIELD()
 			;
-			if (hdr.matches(self(), self(), DISCONNECTED, 0)) {	// tcp link gone, callback was called
-				right().tell(self(), DISCONNECTED, 0);
+			if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
+				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto CONNECTING;
-			} else if (hdr.matches(left(), self(), DISCONNECTED, 0)) { // wifi link gone
-				right().tell(self(), DISCONNECTED, 0);
+			} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
+				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto WIFI_DISCONNECTED;
 			} else if (timeout()) {
 				LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
@@ -451,6 +424,36 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 PT_END()
 }
 
+//____________________________________________________________
+//			Tcp::connect
+//____________________________________________________________
+void TcpClient::connect() {
+
+LOGF(" Connecting ");
+//	ets_memset(_conn, 0, sizeof(_conn));
+_conn->type = ESPCONN_TCP;
+_conn->state = ESPCONN_NONE;
+//	_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
+ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
+_conn->proto.tcp->local_port = espconn_port();
+_conn->proto.tcp->remote_port = _remote_port;
+_conn->reverse = this;
+registerCb(_conn);
+
+if (StrToIP(_host, _conn->proto.tcp->remote_ip)) {
+	LOGF("TCP: Connect to ip  %s:%d", _host, _remote_port);
+	espconn_connect(_conn);
+} else {
+	LOGF("TCP: Connect to domain %s:%d", _host, _remote_port);
+	espconn_gethostbyname(_conn, _host, &_remote_ip.ipAddr, Tcp::dnsFoundCb);
+}
+
+}
+
+ActorRef TcpClient::create(const char* host, uint16_t port) {
+return ActorRef(new TcpClient(host, port));
+}
+
 TcpClient::TcpClient(const char* host, uint16_t port) :
 	Tcp() {
 LOGF("this : %X ", this);
@@ -459,7 +462,6 @@ _remote_port = port;
 logConn(__FUNCTION__, _conn);
 setType(CLIENT);
 _conn = new (struct espconn);
-strcpy(_host, "");
 _remote_port = 80;
 _remote_ip.addr = 0; // should be zero for dns callback to work
 _connected = false;
@@ -473,12 +475,11 @@ _connected = true;		// don't reallocate master client
 
 void TcpClient::onReceive(Header hdr, Cbor& cbor) {
 PT_BEGIN()
-;
 WIFI_DISCONNECTED: {
 	while (true) {
 		PT_YIELD()
 		;
-		if (hdr.matches(self(), left(), CONNECTED, 0)) {
+		if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 			LOGF("TcpClient started. %x", this);
 			goto CONNECTING;
 		}
@@ -489,11 +490,11 @@ CONNECTING: {
 		connect();
 		PT_YIELD()
 		;
-		if (hdr.matches(self(), self(), CONNECTED, 0)) {
-			right().tell(self(), CONNECTED, 0);
+		if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
+			right().tell(self(), REPLY(CONNECT), 0);
 			goto CONNECTED;
-		} else if (hdr.matches(self(), self(), DISCONNECTED, 0)) {
-			right().tell(self(), DISCONNECTED, 0);
+		} else if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {
+			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto WIFI_DISCONNECTED;
 		}
 
@@ -504,13 +505,15 @@ CONNECTED: {
 		setReceiveTimeout(5000);
 		PT_YIELD()
 		;
-		if (hdr.matches(self(), self(), DISCONNECTED, 0)) {	// tcp link gone, callback was called
-			right().tell(self(), DISCONNECTED, 0);
+		if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {// tcp link gone, callback was called
+			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto CONNECTING;
-		} else if (hdr.matches(left(), self(), DISCONNECTED, 0)) { // wifi link gone
-			right().tell(self(), DISCONNECTED, 0);
+		} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
+			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto WIFI_DISCONNECTED;
-		} else if (timeout()) {
+		} else if (hdr.is(TXD,ANY)) {
+			write(cbor);
+		} else if (hdr.is(TIMEOUT,0)) {
 			//			LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
 			/*if ((_lastRxd + 5000) < Sys::millis()) {
 			 LOGF(" timeout - disconnect %X:%X", this, _conn);
@@ -521,7 +524,6 @@ CONNECTED: {
 	}
 }
 PT_END()
-;
 }
 
 TcpServer::TcpServer(uint16_t port) :
@@ -554,11 +556,11 @@ logConn(__FUNCTION__, _conn);
 void TcpServer::onReceive(Header hdr, Cbor& cbor) {
 PT_BEGIN()
 ;
-WIFI_DISCONNECTED: {
+WIFI_DISCONNECT: {
 while (true) {
 	PT_YIELD()
 	;
-	if (hdr.matches(self(), left(), CONNECTED, 0)) {
+	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 		LOGF("TcpServer started. %x", this);
 		listen();
 		goto CONNECTING;
@@ -571,9 +573,9 @@ while (true) {
 	setReceiveTimeout(2000);
 	PT_YIELD()
 	;
-	if (hdr.matches(self(), left(), CONNECTED, 0)) {
+	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 		listTcp();
-		goto WIFI_DISCONNECTED;
+		goto WIFI_DISCONNECT;
 	}
 }
 }
@@ -601,9 +603,6 @@ PT_END()
  _connected = true; // don't reallocate master client
  }
  */
-ActorRef TcpClient::create(const char* host, uint16_t port) {
-return ActorRef(new TcpClient(host, port));
-}
 
 uint8_t StrToIP(const char* str, void *ip) {
 LOGF(" convert  Ip address : %s", str);
