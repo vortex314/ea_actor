@@ -84,6 +84,7 @@ public:
  */
 class MqttSubscriber: public Actor {
 	ActorRef _mqtt;
+	ActorRef _sender;
 	Str _prefix;
 	MqttSubscriber(ActorRef mqtt);
 	Str _topic;
@@ -91,9 +92,11 @@ class MqttSubscriber: public Actor {
 	uint32_t _flags;
 	uint16_t _messageId;
 	uint16_t _retries;
+	uint8_t _qos;
 	void sendPubRec();
 	void sendPubComp();
 	void sendPubAck();
+	void sendSubscribe();
 public:
 	static ActorRef create(ActorRef mqtt);
 	void onReceive(Header, Cbor&);
