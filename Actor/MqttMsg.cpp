@@ -8,7 +8,6 @@
 #include "MqttMsg.h"
 #include <string.h>
 #include <cstring>
-#include <Logger.h>
 
 const char* const MqttNames[] = { "UNKNOWN", "CONNECT", "CONNACK", "PUBLISH",
 		"PUBACK", "PUBREC", "PUBREL", "PUBCOMP", "SUBSCRIBE", "SUBACK",
@@ -270,7 +269,7 @@ bool  MqttMsg::feed(uint8_t data) {
 			_recvState = ST_COMPLETE;
 		}
 	} else if (_recvState == ST_COMPLETE) {
-		WARN("");
+		LOGF("invalid state");
 	}
 // INFO(" state/data/remainingLength %d/%X/%d",_recvState,data,_remainingLength);
 	return _recvState == ST_COMPLETE;
@@ -340,7 +339,7 @@ const char*  MqttMsg::toString(Str& str) {
 
 bool  MqttMsg::parse() {
 	if (length() < 2) {
-		WARN("length :%d", length());
+		LOGF("too short, length :%d", length());
 		return false;
 	}
 	offset(0);
@@ -419,7 +418,7 @@ bool  MqttMsg::parse() {
 		break;
 	}
 	default: {
-		ERROR(" bad Mqtt msg type 0x%x: erc : %d", _header & 0xF0, EINVAL);
+		LOGF(" bad Mqtt msg type 0x%x: erc : %d", _header & 0xF0, EINVAL);
 		break; // ignore bad package
 	}
 	}

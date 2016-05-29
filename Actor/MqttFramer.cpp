@@ -7,64 +7,61 @@
 
 #include "MqttFramer.h"
 
-IROM MqttFramer::MqttFramer(Tcp* stream) :
-		Actor("MqttFrame") {
-	_msg = new MqttMsg(256);
-	_msg->reset();
-	_stream = stream;
+MqttFramer::MqttFramer() :
+		Actor("MqttFrame"), _msg(256) {
+//	_msg = new MqttMsg(256);
+	_msg.reset();
 }
 
-IROM MqttFramer::~MqttFramer() {
-
-}
-extern Str logLine;
-IROM void MqttFramer::send(MqttMsg& msg) {
-//	INFO(" MQTT send : %s ",msg.toHex(logLine.clear()));
-//	INFO(" MQTT send : %s ",((Bytes)msg).toString(logLine.clear()));
-//	INFO("MQTT OUT : %s ", msg.toString(logLine.clear()));
-	if (_stream->hasSpace())
-		_stream->write(msg);
+MqttFramer::~MqttFramer() {
 }
 
-IROM bool MqttFramer::isConnected() {
-	return _stream->isConnected();
+ActorRef MqttFramer::create() {
+	return ActorRef(new MqttFramer());
 }
+#define LOGHEADER(__hdr) LOGF("  %s => %s => %s ",Actor::idxToPath(__hdr._src),Actor::eventToString(__hdr._event),Actor::idxToPath(__hdr._dst))
 
-IROM void MqttFramer::disconnect() {
-	_stream->disconnect();
-}
-
-uint32_t msgCount=0;
-
-void MqttFramer::onReceive(Header hdr,Cbor& cbor) {
+void MqttFramer::onReceive(Header hdr, Cbor& cbor) {
 	PT_BEGIN()
+	PT_WAIT_UNTIL(hdr.is(INIT, ANY));
 	while (true) {
-		PT_YIELD_UNTIL(hdr.is(INIT,ANY));
-
+		PT_YIELD()
+		;
+//		LOGHEADER(hdr);
 		switch (hdr._event) {
-		case RXD: {
-//			INFO(" data rxd");
-/*			int i = 0;
-			while (_stream->hasData()) {
-				i++;
-				if (_msg->feed(_stream->read())) {
-					_msg->parse();
-//					INFO("MQTT IN  : %s", _msg->toString(logLine.clear()));
-					Msg msg2(200);
-					msg2.create(this, SIG_RXD).add(_msg->type()).add(
-							_msg->messageId()); // <type><msgId>
-					if (_msg->type() == MQTT_MSG_PUBLISH) {
-						msg2.addf("iSB", _msg->qos(), _msg->topic(),
-								_msg->message()); // <type><msgId><qos><topic><value>=iiiSB
-						msgCount++;
-//						INFO(" publish received %d ",msgCount);
+		case RXD: { // check data for full mqtt frame, forward when complete
+			Bytes bytes(100);
+			if (cbor.get(bytes)) {
+				bytes.offset(0);
+				while (bytes.hasData()) {
+					uint8_t byte;
+					byte = bytes.read();
+//					LOGF(" byte rxd : %x ",byte);
+					if (_msg.feed(byte)) {	//MQTT complete
+						if (_msg.parse())
+							right().tell(
+									Header(right(), self(), RXD, _msg.type()),
+									cbor);
+						_msg.reset();
 					}
-					msg2.send();
-//					Msg::publish(this, SIG_RXD, _msg->type());
-					_msg->reset();
 				}
-			}*/
-//			INFO("Received %d bytes",i);
+			}
+			break;
+		}
+		case REPLY(CONNECT): {
+			right().tell(self(), REPLY(CONNECT), 0);
+			break;
+		}
+		case REPLY(DISCONNECT): {
+			right().tell(self(), REPLY(DISCONNECT), 0);
+			break;
+		}
+		case REPLY(TXD): {
+			right().tell(self(), REPLY(TXD), 0);
+			break;
+		}
+		case TXD: {
+			left().forward(hdr, cbor);
 			break;
 		}
 		default: {
@@ -73,5 +70,6 @@ void MqttFramer::onReceive(Header hdr,Cbor& cbor) {
 		}
 		}
 	}
-	PT_END();
+PT_END()
+;
 }

@@ -14,17 +14,14 @@
 #include "Tcp.h"
 
 class MqttFramer: public Actor {
-private :
-	Tcp* _stream;
-	MqttMsg* _msg;
+private:
+	MqttMsg _msg;
+	MqttFramer();
 public:
-	 MqttFramer(Tcp* stream);
-	 virtual ~MqttFramer();
-	 bool isConnected();
-	 void connect();
-	 void disconnect();
-	 void send(MqttMsg& msg);
-	 void onReceive(Header hdr,Cbor& cbor);
+
+	virtual ~MqttFramer();
+	void onReceive(Header hdr, Cbor& cbor);
+	static ActorRef create();
 };
 
 #endif /* MQTTFRAMER_H_ */

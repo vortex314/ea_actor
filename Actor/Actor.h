@@ -23,26 +23,14 @@ typedef enum {
 	CONNECT,
 	DISCONNECT,
 	ADD_LISTENER,
+	PUBLISH,
+	SUBSCRIBE,
 	RESPONSE = 0x80,
 	ANY = 0xFF
 } Event;
 #define REPLY(xxx) (Event)(xxx + RESPONSE)
 #define MAX_ACTORS 10
-//#define ANY 0xFF
-/*
- typedef union {
- struct {
- uint8_t dst;
- uint8_t src;
- uint8_t event;
- uint8_t detail;
- };
- uint32_t word;
 
-
- } Header;
-
- */
 class ActorRef;
 class Header {
 public:
@@ -58,12 +46,14 @@ public:
 	Header() {
 		_word = 0;
 	}
-	;
 	Header(ActorRef dst, ActorRef src, Event event, uint8_t detail);
-	Header(int dst, int src, Event event, uint8_t detail);bool matches(
-			ActorRef dst, ActorRef src, Event event, uint8_t detail);bool matches(
-			int dst, int src, Event event, uint8_t detail);bool is(
-			uint8_t event, uint8_t detail);
+	Header(int dst, int src, Event event, uint8_t detail); //
+	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail); //
+	bool matches(int dst, int src, Event event, uint8_t detail); //
+	bool is(uint8_t event, uint8_t detail); //
+	inline bool is(uint8_t event) {
+		return _event == event;
+	}
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
@@ -155,7 +145,7 @@ public:
 	virtual ~Actor();
 	ActorRef self();
 	static void link(ActorRef left, ActorRef right);
-	void tellf(Header hdr,const char* fmt,...);
+	void tellf(Header hdr, const char* fmt, ...);
 	void tell(Header header, Cbor& data);
 	void tell(ActorRef src, Event event, uint8_t detail);
 	static Actor& byIndex(uint8_t idx);

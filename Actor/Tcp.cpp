@@ -176,6 +176,7 @@ Erc Tcp::write(Bytes& bytes) {
 }
 
 Erc Tcp::write(uint8_t* pb, uint32_t length) {
+//	LOGF(" sending : %d bytes", length);
 	logConn(__FUNCTION__, _conn);
 	uint32_t i = 0;
 	while (_txd.hasSpace() && (i < length)) {
@@ -301,7 +302,7 @@ void Tcp::writeFinishCb(void* arg) {
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
 	pTcp->send();
-	pTcp->right().tell(pTcp->self(), TXD, 0);
+//	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
 
@@ -311,7 +312,7 @@ void Tcp::sendCb(void *arg) {
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
 	pTcp->send();
-	pTcp->right().tell(pTcp->self(), TXD, 0);
+	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
 
@@ -324,10 +325,14 @@ void Tcp::recvCb(void* arg, char *pdata, unsigned short len) {
 		pTcp->_lastRxd = Sys::millis();
 		Bytes bytes;
 		bytes.map((uint8_t*) pdata, (uint32_t) len);
-
+//		LOGF(" received : %d bytes",len);
+//		Str str(400);
+//		bytes.toHex(str);
+//		LOGF(" received : %s ",str.c_str());
 		Erc erc;
-		pTcp->right().tell(Header(pTcp->right(), pTcp->self(), RXD, 0),
-				(Cbor&) bytes);
+		Cbor cbor(256);
+		cbor.add(bytes);
+		pTcp->right().tell(Header(pTcp->right(), pTcp->self(), RXD, 0), cbor);
 //		if (erc = Msg::queue().putf("uuB", pTcp, SIG_RXD, &bytes)) {
 //			pTcp->_overflowRxd++;
 //		}
@@ -383,11 +388,12 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 	WIFI_DISCONNECTED: {
 		while (true) {
 			PT_YIELD_UNTIL(hdr.matches(left(), self(), REPLY(CONNECT), ANY));
-			LOGF("Tcp started. %x", this);
+//			LOGF("Tcp started. %x", this);
 			goto CONNECTING;
 		}
 	}
 	CONNECTING: {
+		LOGF("CONNECTING");
 		while (true) {
 			PT_YIELD()
 			;
@@ -401,6 +407,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		}
 	}
 	CONNECTED: {
+		LOGF("CONNECTED");
 		while (true) {
 			setReceiveTimeout(5000);
 			PT_YIELD()
@@ -429,7 +436,7 @@ PT_END()
 //____________________________________________________________
 void TcpClient::connect() {
 
-LOGF(" Connecting ");
+//LOGF(" Connecting ");
 //	ets_memset(_conn, 0, sizeof(_conn));
 _conn->type = ESPCONN_TCP;
 _conn->state = ESPCONN_NONE;
@@ -462,7 +469,6 @@ _remote_port = port;
 logConn(__FUNCTION__, _conn);
 setType(CLIENT);
 _conn = new (struct espconn);
-_remote_port = 80;
 _remote_ip.addr = 0; // should be zero for dns callback to work
 _connected = false;
 ets_memset(_conn, 0, sizeof(_conn));
@@ -511,15 +517,20 @@ CONNECTED: {
 		} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
 			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto WIFI_DISCONNECTED;
-		} else if (hdr.is(TXD,ANY)) {
-			write(cbor);
-		} else if (hdr.is(TIMEOUT,0)) {
+		} else if (hdr.is(TXD)) {
+//			LOGF(" cbor length : %d offset : %d", cbor.length(), cbor.offset())
+			Bytes data(256);
+			cbor.get(data);
+			write(data);
+		} else if (hdr.is(TIMEOUT)) {
 			//			LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
 			/*if ((_lastRxd + 5000) < Sys::millis()) {
 			 LOGF(" timeout - disconnect %X:%X", this, _conn);
 			 disconnect();
 			 }
 			 */
+		} else if (hdr.is(DISCONNECT)) {
+			disconnect();
 		}
 	}
 }
