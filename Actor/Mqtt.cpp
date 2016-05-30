@@ -188,7 +188,6 @@ PINGING: {
 	}
 
 	PT_END()
-	;
 }
 //________________________________________________________________________________________________________
 //
@@ -360,20 +359,20 @@ READY: {
 			cbor.offset(0);
 			cbor.scanf("B", &mqttIn);
 			if (mqttIn.parse()) {
-				_topic = mqttIn.topic();
-				_message = mqttIn.message();
+				_topic = *mqttIn.topic();
+				_message = *mqttIn.message();
 				_qos = mqttIn.qos();
 			} else
 				goto READY;
 			if (_qos == MQTT_QOS0_FLAG) {
 				cborOut.clear();
-				cborOut << _topic << _message;
+				cborOut.add(_topic).add(_message);
 				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
 				goto READY;
 			} else if (_qos == MQTT_QOS1_FLAG) {
 				sendPubAck();
 				cborOut.clear();
-				cborOut << _topic << _message;
+				cborOut.add(_topic).add(_message);
 				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
 				goto READY;
 			} else if (_qos == MQTT_QOS2_FLAG) {
@@ -383,25 +382,26 @@ READY: {
 		}
 	}
 QOS2_REC: {
-		while (true) {
+	_retries=0;
+		while (_retries<MQTT_PUB_MAX_RETRIES) {
 			sendPubRec();
 			setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
 			PT_WAIT_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD, MQTT_MSG_PUBREL));
 			if (hdr.is(TIMEOUT)) {
 				_retries++;
-				if (_retries > MQTT_PUB_MAX_RETRIES) {
-					right().tell();
-				}
+
 			} else if (hdr.is(RXD, MQTT_MSG_SUBACK)) {
 				cborOut.clear();
-				cborOut << _topic << _message;
 				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
 				goto READY;
 			}
 
 		}
+		cborOut.clear();
+		right().tell(Header(right(), self(), REPLY(SUBSCRIBE), EAGAIN), cborOut);
 	}
-SUBCRIBING:  {
+SUBSCRIBING:  {
+	cborOut.clear();
 	if ( cbor.scanf("uSB",&_qos,&_topic,&_message)==false){
 		LOGF("invalid subscribe args");
 		goto READY;
@@ -414,13 +414,13 @@ SUBCRIBING:  {
 		if (hdr.is(TIMEOUT)) {
 			_retries++;
 		} else if (hdr.is(RXD, MQTT_MSG_SUBACK)) {
-			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut.reset());
+			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0),cborOut );
 			goto READY;
 		} else {
 			unhandled(hdr);
 		}
 	}
-	right().tell(Header(right(),_mqtt,REPLY(SUBSCRIBE),E_TIMEOUT),cborOut.clear());
+	right().tell(Header(right(),_mqtt,REPLY(SUBSCRIBE),E_TIMEOUT),cborOut);
 	}
 	PT_END()
 }
