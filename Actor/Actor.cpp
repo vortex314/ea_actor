@@ -10,6 +10,7 @@
 #include <CborQueue.h>
 #include <Arduino.h>
 #include <stdio.h>
+#include <stdarg.h>
 #ifndef UINT64_MAX
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFL
 #endif

@@ -112,6 +112,7 @@ public:
 	void delegate(Header header, Cbor& data); // handle by another onReceive, keep header
 	void route(Header, Cbor&); // change destination and put back on queue
 	void tell(ActorRef src, Event event, uint8_t detail);
+	void reply(Header hdr,Cbor& cbor);
 	ActorRef operator>>(ActorRef ref);
 	uint8_t idx() {
 		return _idx;
