@@ -65,6 +65,7 @@ public:
 	uint16_t  messageId(); // if < 0 then not found
 	uint8_t  type();
 	uint8_t  qos();
+	uint8_t header();
 	bool  complete();
 	void  complete(bool st);
 	void  reset();

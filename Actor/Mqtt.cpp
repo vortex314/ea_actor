@@ -333,6 +333,7 @@ MqttSubscriber::MqttSubscriber(ActorRef mqtt) :
 	_messageId = 1;
 	_retries = 0;
 	_mqtt = mqtt;
+	_qos=0;
 }
 
 ActorRef MqttSubscriber::create(ActorRef mqtt) {
@@ -400,21 +401,26 @@ QOS2_REC: {
 
 		}
 	}
-SUBCRIBING: while (true) {
+SUBCRIBING:  {
+	if ( cbor.scanf("uSB",&_qos,&_topic,&_message)==false){
+		LOGF("invalid subscribe args");
+		goto READY;
+		}
+	_retries=0;
+	while (_retries < MQTT_PUB_MAX_RETRIES) {
 		sendSubscribe();
 		setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-		PT_WAIT_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD, MQTT_MSG_PUBREL));
+		PT_WAIT_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD, MQTT_MSG_SUBACK));
 		if (hdr.is(TIMEOUT)) {
 			_retries++;
-			if (_retries > MQTT_PUB_MAX_RETRIES) {
-				right().tell(self(), REPLY(SUBSCRIBE), E);
-			}
 		} else if (hdr.is(RXD, MQTT_MSG_SUBACK)) {
-			cborOut.clear();
-			cborOut << _topic << _message;
-			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
+			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut.reset());
 			goto READY;
+		} else {
+			unhandled(hdr);
 		}
+	}
+	right().tell(Header(right(),_mqtt,REPLY(SUBSCRIBE),E_TIMEOUT),cborOut.clear());
 	}
 	PT_END()
 }
