@@ -245,6 +245,7 @@ void Actor::eventLoop() {
 				Header header(_actors[i]->_idx, _dummy->_idx, TIMEOUT, 0);
 //				LOGHEADER(header);
 				actor->onReceive(header, cbor);
+				actor->setReceiveTimeout(UINT32_MAX);
 			}
 		}
 	}
