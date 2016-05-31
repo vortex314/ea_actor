@@ -14,6 +14,7 @@ ActorRef tcpClient;
 ActorRef wifi;
 ActorRef mqtt;
 ActorRef mqttFramer;
+ActorRef dwm1000;
 
 extern "C" void setup(void) {
 	Serial.begin(115200);
@@ -29,6 +30,7 @@ extern "C" void setup(void) {
 	mqttFramer = MqttFramer::create();
 
 	wifi >> tcpClient >> mqttFramer >> mqtt >> ledBlinker;
+	dwm1000 = Dwm1000::create(mqtt);
 
 	Actor::broadcast(Actor::dummy(), INIT, 0);
 

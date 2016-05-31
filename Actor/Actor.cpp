@@ -188,6 +188,11 @@ void Actor::tell(Header header, Cbor& bytes) {
 	};
 }
 
+void Actor::tell(ActorRef src, Event event, uint8_t detail,Cbor& cbor) {
+	Header w(self(), src, event, detail);
+	tell(w, cbor);
+}
+
 void Actor::tell(ActorRef src, Event event, uint8_t detail) {
 	Header w(self(), src, event, detail);
 	Cbor cbor(0);
