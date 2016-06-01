@@ -20,6 +20,7 @@ public:
 	}
 	void init();
 	void onReceive(Header hdr, Cbor& data);
+	void publish(uint8_t qos,const char* key,Str& value);
 };
 
 #endif /* DWM1000_H_ */

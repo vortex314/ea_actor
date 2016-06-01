@@ -6,6 +6,7 @@
 #include <Mqtt.h>
 #include <MqttFramer.h>
 #include <LedBlinker.h>
+#include <Config.h>
 #include <pins_arduino.h>
 //#include <PubSubClient.h>
 
@@ -15,6 +16,7 @@ ActorRef wifi;
 ActorRef mqtt;
 ActorRef mqttFramer;
 ActorRef dwm1000;
+ActorRef config;
 
 extern "C" void setup(void) {
 	Serial.begin(115200);
@@ -26,8 +28,9 @@ extern "C" void setup(void) {
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
 	tcpClient = TcpClient::create("test.mosquitto.org", 1883);
-	mqtt = Mqtt::create();
+	mqtt = Mqtt::create("anchor");
 	mqttFramer = MqttFramer::create();
+	config = Config::create();
 
 	wifi >> tcpClient >> mqttFramer >> mqtt >> ledBlinker;
 	dwm1000 = Dwm1000::create(mqtt);

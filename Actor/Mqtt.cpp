@@ -14,16 +14,16 @@ extern "C" {
 #include <user_interface.h>
 }
 
-MqttMsg mqttIn(256);
-MqttMsg mqttOut(256);
-Cbor cborOut(256);
+MqttMsg _mqttIn(256);
+MqttMsg _mqttOut(256);
 
 //________________________________________________________________________________________________________
 //
 //________________________________________________________________________________________________________
 //
-Mqtt::Mqtt() :
+Mqtt::Mqtt(const char* prefix) :
 	Actor("Mqtt") {
+	_prefix=prefix;
 	_connector = MqttConnector::create(self());
 	_publisher = MqttPublisher::create(self());
 	_subscriber = MqttSubscriber::create(self());
@@ -115,13 +115,10 @@ CONNECTED: {
 		while (true) {
 			setReceiveTimeout(MQTT_TIME_RECONNECT);
 
-			mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
+			_mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
 			                "system/alive", onlineFalse, "", "",
 			                TIME_KEEP_ALIVE / 1000);
-
-			cborOut.clear();
-			cborOut.add(mqttOut);
-			_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 			PT_WAIT_UNTIL(hdr.is(REPLY(DISCONNECT)) ||hdr.is(RXD, MQTT_MSG_CONNACK) );
 			if (hdr.is(REPLY(DISCONNECT)))
 				goto DISCONNECTED;
@@ -166,10 +163,10 @@ WAITING: { // wait between PING's
 PINGING: {
 		_retries = 1;
 		while (_retries < 3) {
-			mqttOut.PingReq();
-			cborOut.clear();
-			cborOut.add(mqttOut);
-			_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+			_mqtt.tell(self(), PUBLISH, 0,
+							_cborOut.putf("sB", "system/online", Str("true")));
+			_mqttOut.PingReq();
+			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 			setReceiveTimeout(TIME_PING);
 
 			PT_YIELD_UNTIL(
@@ -221,17 +218,13 @@ void MqttPublisher::sendPublish() {
 	if (_retries) {
 		header += MQTT_DUP_FLAG;
 	}
-	mqttOut.Publish(header, _topic, _message, _messageId);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.Publish(header, _topic, _message, _messageId);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 }
 
 void MqttPublisher::sendPubRel() {
-	mqttOut.PubRel(_messageId);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.PubRel(_messageId);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 }
 
 void MqttPublisher::onReceive(Header hdr, Cbor& cbor) {
@@ -357,23 +350,19 @@ READY: {
 			_topic.clear();
 			_message.clear();
 			cbor.offset(0);
-			cbor.scanf("B", &mqttIn);
-			if (mqttIn.parse()) {
-				_topic = *mqttIn.topic();
-				_message = *mqttIn.message();
-				_qos = mqttIn.qos();
+			cbor.scanf("B", &_mqttIn);
+			if (_mqttIn.parse()) {
+				_topic = *_mqttIn.topic();
+				_message = *_mqttIn.message();
+				_qos = _mqttIn.qos();
 			} else
 				goto READY;
 			if (_qos == MQTT_QOS0_FLAG) {
-				cborOut.clear();
-				cborOut.add(_topic).add(_message);
-				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
+				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&(Str)_topic,&(Bytes)_message));
 				goto READY;
 			} else if (_qos == MQTT_QOS1_FLAG) {
 				sendPubAck();
-				cborOut.clear();
-				cborOut.add(_topic).add(_message);
-				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
+				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&(Str)_topic,&(Bytes)_message));
 				goto READY;
 			} else if (_qos == MQTT_QOS2_FLAG) {
 
@@ -391,17 +380,14 @@ QOS2_REC: {
 				_retries++;
 
 			} else if (hdr.is(RXD, MQTT_MSG_SUBACK)) {
-				cborOut.clear();
-				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), cborOut);
+				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf(""));
 				goto READY;
 			}
 
 		}
-		cborOut.clear();
-		right().tell(Header(right(), self(), REPLY(SUBSCRIBE), EAGAIN), cborOut);
+		right().tell(Header(right(), self(), REPLY(SUBSCRIBE), EAGAIN), _cborOut.putf(""));
 	}
 SUBSCRIBING:  {
-	cborOut.clear();
 	if ( cbor.scanf("uSB",&_qos,&_topic,&_message)==false){
 		LOGF("invalid subscribe args");
 		goto READY;
@@ -414,44 +400,36 @@ SUBSCRIBING:  {
 		if (hdr.is(TIMEOUT)) {
 			_retries++;
 		} else if (hdr.is(RXD, MQTT_MSG_SUBACK)) {
-			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0),cborOut );
+			right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0),_cborOut.putf("") );
 			goto READY;
 		} else {
 			unhandled(hdr);
 		}
 	}
-	right().tell(Header(right(),_mqtt,REPLY(SUBSCRIBE),E_TIMEOUT),cborOut);
+	right().tell(Header(right(),_mqtt,REPLY(SUBSCRIBE),E_TIMEOUT),_cborOut.putf(""));
 	}
 	PT_END()
 }
 
 void MqttSubscriber::sendPubRec() {
-	mqttOut.PubRec(_messageId);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.PubRec(_messageId);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 	setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
 }
 
 void MqttSubscriber::sendPubComp() {
-	mqttOut.PubComp(_messageId);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.PubComp(_messageId);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 	setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
 }
 
 void MqttSubscriber::sendPubAck() {
-	mqttOut.PubAck(_messageId);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.PubAck(_messageId);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 }
 
 void MqttSubscriber::sendSubscribe() {
-	mqttOut.Subscribe(_topic, _messageId, MQTT_QOS1_FLAG);
-	cborOut.clear();
-	cborOut.add(mqttOut);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), cborOut);
+	_mqttOut.Subscribe(_topic, _messageId, MQTT_QOS1_FLAG);
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
 }
 

@@ -17,7 +17,7 @@ typedef enum {
 	TIMEOUT,
 	STOP,
 	RESTART,
-	CONFIG,
+	CONFIG,	// detail =0, initial params in payload, =1 , load config from flash again
 	TXD,
 	RXD,
 	CONNECT,
@@ -137,6 +137,7 @@ private:
 	static uint32_t _count;
 	static Actor* _dummy;
 	static CborQueue* _cborQueue;
+	static Cbor _cborOut;
 protected:
 	LineNumber _ptLine;
 	static const char* eventToString(uint8_t event);
@@ -175,5 +176,6 @@ public:
 	bool timeout();
 	void setReceiveTimeout(uint32_t time);
 };
+
 
 #endif /* ACTOR_H_ */

@@ -19,15 +19,23 @@
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
  * OUT : TXD(MQTT_PING),CONNECT
  */
+static MqttMsg _mqttIn;
+static MqttMsg _mqttOut;
+
+enum {
+	PREFIX
+} MqttConfigKey;
+
 class Mqtt: public Actor {
 	ActorRef _framer;
 	ActorRef _connector;
 	ActorRef _pinger;
 	ActorRef _publisher;
 	ActorRef _subscriber;
-
+	Str _prefix;
 	Mqtt();
 public:
+
 	virtual ~Mqtt();
 	void onReceive(Header, Cbor&);
 	static ActorRef create();
@@ -85,7 +93,7 @@ public:
 class MqttSubscriber: public Actor {
 	ActorRef _mqtt;
 	ActorRef _sender;
-	Str _prefix;
+
 	MqttSubscriber(ActorRef mqtt);
 	Str _topic;
 	Bytes _message;
@@ -102,7 +110,5 @@ public:
 	void onReceive(Header, Cbor&);
 };
 
-extern MqttMsg mqttIn;
-extern MqttMsg mqttOut;
 
 #endif /* MQTT_H_ */

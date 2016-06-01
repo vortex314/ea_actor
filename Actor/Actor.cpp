@@ -20,6 +20,7 @@ const char*strEvent[] = { "INIT", "TIMEOUT", "STOP", "RESTART", "CONFIG", "TXD",
 		"RXD", "CONNECT", "DISCONNECT", "CONNECTED", "DISCONNECTED" };
 
 char sEvent[20];
+Cbor Actor::_cborOut(256);
 
 const char* Actor::eventToString(uint8_t event) {
 	if (event & 0x80) {
