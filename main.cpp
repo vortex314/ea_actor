@@ -8,6 +8,7 @@
 #include <LedBlinker.h>
 #include <Config.h>
 #include <pins_arduino.h>
+#include <Dwm1000.h>
 //#include <PubSubClient.h>
 
 ActorRef ledBlinker;

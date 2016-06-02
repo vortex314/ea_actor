@@ -19,8 +19,7 @@
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
  * OUT : TXD(MQTT_PING),CONNECT
  */
-static MqttMsg _mqttIn;
-static MqttMsg _mqttOut;
+
 
 enum {
 	PREFIX
@@ -33,12 +32,14 @@ class Mqtt: public Actor {
 	ActorRef _publisher;
 	ActorRef _subscriber;
 	Str _prefix;
-	Mqtt();
+	Mqtt(const char *prefix);
+	static MqttMsg _mqttIn;
+	static MqttMsg _mqttOut;
 public:
 
 	virtual ~Mqtt();
 	void onReceive(Header, Cbor&);
-	static ActorRef create();
+	static ActorRef create(const char* prefix);
 };
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
@@ -63,6 +64,7 @@ class MqttConnector: public Actor {
 public:
 	static ActorRef create(ActorRef mqtt);
 	void onReceive(Header, Cbor&);
+	void init();
 };
 /*
  * IN : INIT, CONFIG("prefix"), RXD(MQTT_PUBACK,MQTT_PUBREC),REPLY(TXD)

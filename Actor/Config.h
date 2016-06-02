@@ -23,17 +23,14 @@
  */
 class Config : public Actor {
 public:
-	Config() : Actor("Config"){
-		;
-	}
+	Config() ;
 	static Config* _configServer;
-
+	void init();
 public:
 	virtual ~Config();
 	static ActorRef create() {
 		return ActorRef(new Config());
 	}
-	void init();
 	void onReceive(Header hdr, Cbor& data);
 	static ActorRef getConfigServer() {
 		return ActorRef(_configServer);

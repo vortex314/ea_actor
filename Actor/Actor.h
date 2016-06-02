@@ -7,7 +7,7 @@
 
 #ifndef ACTOR_H_
 #define ACTOR_H_
-
+#include <stdint.h>
 #include <Sys.h>
 #include <Cbor.h>
 #include <CborQueue.h>
@@ -138,13 +138,14 @@ private:
 	static uint32_t _count;
 	static Actor* _dummy;
 	static CborQueue* _cborQueue;
-	static Cbor _cborOut;
+
 protected:
 	LineNumber _ptLine;
 	static const char* eventToString(uint8_t event);
 	static const char* idxToPath(uint8_t idx);
 	static void logHeader(Header);
 public:
+	static Cbor _cborOut;
 	Actor(const char* name);
 	virtual ~Actor();
 	ActorRef self();
@@ -177,6 +178,7 @@ public:
 	bool timeout();
 	void setReceiveTimeout(uint32_t time);
 };
+
 
 
 #endif /* ACTOR_H_ */

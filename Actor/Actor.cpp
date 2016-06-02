@@ -10,7 +10,7 @@
 #include <CborQueue.h>
 #include <Arduino.h>
 #include <stdio.h>
-#include <stdarg.h>
+#include <cstdarg>
 #ifndef UINT64_MAX
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFL
 #endif
@@ -189,9 +189,9 @@ void Actor::tell(Header header, Cbor& bytes) {
 	};
 }
 
-void Actor::tell(ActorRef src, Event event, uint8_t detail,Cbor& cbor) {
-	Header w(self(), src, event, detail);
-	tell(w, cbor);
+void ActorRef::tell(ActorRef src, Event event, uint8_t detail,Cbor& cbor) {
+	Header hdr(*this, src, event, detail);
+	tell(hdr, cbor);
 }
 
 void Actor::tell(ActorRef src, Event event, uint8_t detail) {

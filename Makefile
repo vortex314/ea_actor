@@ -19,6 +19,7 @@
 
 #=== Project specific definitions: sketch and list of needed libraries
 ESP_LIBS ?= /home/lieven/workspace/Arduino/libraries
+ESPTOOL = ../esp_tcp/tools/esptool.py #//TODO
 INCLUDE_DIRS ?= ../Common/inc . ./Actor ./esp8266
 CORE_DIR ?= $(ESP_LIBS)
 # USER_DIRS ?= $(ESP_LIBS)
@@ -89,7 +90,7 @@ CPP = $(TOOLS_BIN)/xtensa-lx106-elf-g++
 LD =  $(CC)
 AR = $(TOOLS_BIN)/xtensa-lx106-elf-ar
 ESP_TOOL = $(TOOLS_ROOT)/esptool/esptool
-ESPTOOL = ../esp_tcp/tools/esptool.py
+
 OTA_TOOL = $(TOOLS_ROOT)/espota.py
 
 INCLUDE_DIRS += $(SDK_ROOT)/include $(SDK_ROOT)/lwip/include $(CORE_DIR) $(ESP_ROOT)/variants/generic $(OBJ_DIR)
@@ -179,7 +180,7 @@ symbols : $(MAIN_ELF)
 	nm -C -n $(MAIN_ELF) > build/symbols.txt
 	
 flash: $(MAIN_EXE)
-	/home/lieven/workspace/esp_tcp/tools/reset $(UPLOAD_PORT)
+#	/home/lieven/workspace/esp_tcp/tools/reset $(UPLOAD_PORT)
 #	$(ESP_TOOL) --port $(ESPPORT)  read_mac
 	$(ESPTOOL) --port $(UPLOAD_PORT)  read_flash  0x3F8000 0x100 dump.bin 
 	od --endian=little -X -c dump.bin > $(LOG)

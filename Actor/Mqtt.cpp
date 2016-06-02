@@ -33,8 +33,8 @@ Mqtt::Mqtt(const char* prefix) :
 Mqtt::~Mqtt() {
 }
 
-ActorRef Mqtt::create() {
-	return ActorRef(new Mqtt());
+ActorRef Mqtt::create(const char* prefix) {
+	return ActorRef(new Mqtt(prefix));
 }
 
 void Mqtt::onReceive(Header hdr, Cbor& cbor) {
@@ -102,7 +102,7 @@ MqttConnector::MqttConnector(ActorRef mqtt) :
 }
 
 void MqttConnector::init() {
-	ActorRef.byPath("Config").tell(self(),CONFIG,RXD,_cborOut.putf("s","mqtt/clientId"))
+	ActorRef::byPath("Config").tell(self(),CONFIG,RXD,_cborOut.putf("s","mqtt/clientId"));
 		sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
 }
 
@@ -123,7 +123,7 @@ CONNECTED: {
 			_mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
 			                "system/alive", onlineFalse, "", "",
 			                TIME_KEEP_ALIVE / 1000);
-			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 			PT_WAIT_UNTIL(hdr.is(REPLY(DISCONNECT)) ||hdr.is(RXD, MQTT_MSG_CONNACK) );
 			if (hdr.is(REPLY(DISCONNECT)))
 				goto DISCONNECTED;
@@ -169,9 +169,9 @@ PINGING: {
 		_retries = 1;
 		while (_retries < 3) {
 			_mqtt.tell(self(), PUBLISH, 0,
-							_cborOut.putf("sB", "system/online", Str("true")));
+							_cborOut.putf("ss", "system/online", "true"));
 			_mqttOut.PingReq();
-			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+			_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 			setReceiveTimeout(TIME_PING);
 
 			PT_YIELD_UNTIL(
@@ -224,12 +224,12 @@ void MqttPublisher::sendPublish() {
 		header += MQTT_DUP_FLAG;
 	}
 	_mqttOut.Publish(header, _topic, _message, _messageId);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 }
 
 void MqttPublisher::sendPubRel() {
 	_mqttOut.PubRel(_messageId);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 }
 
 void MqttPublisher::onReceive(Header hdr, Cbor& cbor) {
@@ -363,11 +363,11 @@ READY: {
 			} else
 				goto READY;
 			if (_qos == MQTT_QOS0_FLAG) {
-				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&(Str)_topic,&(Bytes)_message));
+				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&_topic,&_message));
 				goto READY;
 			} else if (_qos == MQTT_QOS1_FLAG) {
 				sendPubAck();
-				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&(Str)_topic,&(Bytes)_message));
+				right().tell(Header(right(), self(), REPLY(SUBSCRIBE), 0), _cborOut.putf("SB",&_topic,&_message));
 				goto READY;
 			} else if (_qos == MQTT_QOS2_FLAG) {
 
@@ -418,23 +418,23 @@ SUBSCRIBING:  {
 
 void MqttSubscriber::sendPubRec() {
 	_mqttOut.PubRec(_messageId);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 	setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
 }
 
 void MqttSubscriber::sendPubComp() {
 	_mqttOut.PubComp(_messageId);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 	setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
 }
 
 void MqttSubscriber::sendPubAck() {
 	_mqttOut.PubAck(_messageId);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 }
 
 void MqttSubscriber::sendSubscribe() {
 	_mqttOut.Subscribe(_topic, _messageId, MQTT_QOS1_FLAG);
-	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&(Bytes)_mqttOut));
+	_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B",&_mqttOut));
 }
 
