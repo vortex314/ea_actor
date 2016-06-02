@@ -123,6 +123,7 @@ public:
 	static ActorRef dummy() {
 		return ActorRef(0);
 	}
+	static ActorRef byPath(const char* path);
 };
 
 class Actor {

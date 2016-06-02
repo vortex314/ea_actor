@@ -23,7 +23,10 @@
  */
 class Config : public Actor {
 public:
-	Config();
+	Config() : Actor("Config"){
+		;
+	}
+	static Config* _configServer;
 
 public:
 	virtual ~Config();
@@ -32,6 +35,9 @@ public:
 	}
 	void init();
 	void onReceive(Header hdr, Cbor& data);
+	static ActorRef getConfigServer() {
+		return ActorRef(_configServer);
+	}
 };
 
 #endif /* CONFIG_H_ */

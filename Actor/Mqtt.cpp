@@ -98,7 +98,12 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 MqttConnector::MqttConnector(ActorRef mqtt) :
 	Actor("MqttConnector"), _clientId("nocl") {
 	_mqtt = mqtt;
-	sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
+
+}
+
+void MqttConnector::init() {
+	ActorRef.byPath("Config").tell(self(),CONFIG,RXD,_cborOut.putf("s","mqtt/clientId"))
+		sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
 }
 
 ActorRef MqttConnector::create(ActorRef mqtt) {
