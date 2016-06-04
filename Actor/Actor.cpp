@@ -6,7 +6,7 @@
  */
 
 #include "Actor.h"
-#include <Logger.h>
+#include <Sys.h>
 #include <CborQueue.h>
 #include <Arduino.h>
 #include <stdio.h>
@@ -21,6 +21,7 @@ const char*strEvent[] = { "INIT", "TIMEOUT", "STOP", "RESTART", "CONFIG", "TXD",
 
 char sEvent[20];
 Cbor Actor::_cborOut(256);
+Cbor Actor::_cborIn(256);
 
 const char* Actor::eventToString(uint8_t event) {
 	if (event & 0x80) {
@@ -94,8 +95,9 @@ uint32_t Actor::_count = 0;
 Actor* Actor::_dummy = 0;
 
 void Actor::setup() {
-	_dummy = new Actor("Dummy");
 	_cborQueue = new CborQueue(1024);
+	_dummy = new Actor("Dummy");
+	LOGF(" CborQueue %X:%d ",_cborQueue,_cborQueue->_size);
 }
 
 Actor& Actor::dummy() {
@@ -103,7 +105,9 @@ Actor& Actor::dummy() {
 }
 
 Actor::Actor(const char* path) {
+	LOGF(" %s cborQueue %X :%d ",path,_cborQueue,_cborQueue->_size);
 	_idx = _count++;
+	ASSERT_LOG(_count < MAX_ACTORS);
 	_actors[_idx] = this;
 	_path = path;
 //	LOGF("ctor %s %d ",_path,_idx);
@@ -167,14 +171,16 @@ uint8_t Actor::idx() {
 	return _idx;
 }
 
-void Actor::tellf(Header hdr, const char* fmt, ...) {
-	Cbor msg(1000);
-	msg.add(hdr._word);
+void Actor::send(const char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	msg.vaddf(fmt, args);
+	LOGF(" fmt : %s", fmt);
+	LOGF(" cborQueue %X ",_cborQueue);
+	Erc erc = _cborQueue->vputf(fmt, args);
 	va_end(args);
-	_cborQueue->put(msg);
+	if (erc) {
+		LOGF("  >> erc : %d ", erc);
+	};
 }
 
 void Actor::tell(Header header, Cbor& bytes) {
@@ -183,13 +189,14 @@ void Actor::tell(Header header, Cbor& bytes) {
 //			strEvent[header._event], header._detail,
 //			Actor::byIndex(header._dst).path());
 	header._dst = self().idx();
+	LOGF(" cborQueue %X ",_cborQueue);
 	Erc erc = _cborQueue->putf("uB", header._word, &bytes);
 	if (erc) {
 		LOGF("  >> erc : %d ", erc);
 	};
 }
 
-void ActorRef::tell(ActorRef src, Event event, uint8_t detail,Cbor& cbor) {
+void ActorRef::tell(ActorRef src, Event event, uint8_t detail, Cbor& cbor) {
 	Header hdr(*this, src, event, detail);
 	tell(hdr, cbor);
 }
@@ -205,14 +212,10 @@ void ActorRef::delegate(Header hdr, Cbor& data) {
 }
 
 void Actor::broadcast(Actor& src, Event event, uint8_t detail) {
-	Header w(ANY, src.idx(), event, detail);
-	Cbor cbor(0);
-	LOGF("broacast %X", w._word);
-	Erc erc = _cborQueue->putf("uB", w._word, &cbor);
-	if (erc) {
-		LOGF(" cborQueue put failed : %d ", erc);
-	}
+	_cborOut.clear();
+	_cborQueue->putf("uB", Header(ANY, src.idx(), event, detail),&_cborOut);
 }
+
 #define LOGHEADER(__hdr) LOGF("  %s => %s => %s ",Actor::idxToPath(__hdr._src),Actor::eventToString(__hdr._event),Actor::idxToPath(__hdr._dst))
 void Actor::logHeader(Header hdr) {
 	LOGF(" event %s => %s,%d => %s ", Actor::idxToPath(hdr._src),
@@ -220,23 +223,26 @@ void Actor::logHeader(Header hdr) {
 			Actor::idxToPath(hdr._dst));
 }
 
-Cbor _data(256);
 
 void Actor::eventLoop() {
+//	LOGF(" cborQueue %X :%d ",_cborQueue,_cborQueue->_size);
 	while (_cborQueue->hasData()) {
 		Header header;
-		_cborQueue->getf("uB", &header, &_data);
-		_data.offset(0);
+		Erc erc= _cborQueue->getf("uB", &header, &_cborIn);
+		LOGF(" erc %d ",erc);
+		ASSERT_LOG(erc==E_OK);
+		_cborIn.offset(0);
+
 //		LOGF("cbor length : %d ",_data.length());
 		if (header._dst == ANY) {
 			for (uint32_t i = 0; i < _count; i++) {
 				header._dst = i;
 				LOGHEADER(header);
-				Actor::byIndex(i).onReceive(header, _data);
+				Actor::byIndex(i).onReceive(header, _cborIn);
 			}
 		} else if (header._dst < _count) {
 			LOGHEADER(header);
-			Actor::byIndex(header._dst).onReceive(header, _data);
+			Actor::byIndex(header._dst).onReceive(header, _cborIn);
 		} else {
 			LOGHEADER(header);
 			LOGF(" invalid dst : %d", header._dst);
@@ -316,86 +322,3 @@ const char* ActorRef::path() {
 	return actor().path();
 }
 
-//______________________________________________________
-//
-/*
- #define MAX_RIGHTS 4
- class Router: public Actor {
- Actor& _rights[MAX_RIGHTS];
- Actor& _left;
- Router() {
- _left = deadLetterActor;
- for (int i = 0; i < MAX_RIGHTS; i++)
- _rights[i] = deadLetterActor;reference
- }
-
- void onReceive(Event event, int detail, Cbor& cbor) {
- if (sender() == left()) {
- for (int i = 0; i < MAX_RIGHTS; i++)
- if (_rights[i] != 0) {
- _rights[i].sender(sender());
- _rights[i].onReceive(event, detail, cbor);
- }
- } else {
- for (int i = 0; i < MAX_RIGHTS; i++)
- if (sender() == right(i)) {
- _left.sender(sender());
- _left.onReceive(event, detail, cbor);
- return;
- }
- deadLetterActor.onReceive(event, detail, cbor);
- }
- }
- Actor& left() {
- return _left;
- }
- Actor& right(int i) {
- return _rights[i];
- }
- };
-
-
-
- class ChildActor: public Actor {
- Actor& _parent;
- public:
- ChildActor(Actor& parent) :
- Actor("child") {
- _parent = parent;
- }
- ~ChildActor() {
-
- }
- void onReceive(Event event, int detail, Cbor& cbor) {
- if (event == TXD) {
- _parent.tell(self(), TXD, 0, cbor)
- }
- }
- };
- class ParentActor: public Actor {
- public:
- ParentActor() :
- Actor("child") {
-
- }
- ~ParentActor() {
-
- }
- void onReceive(Event event, int detail, Cbor& cbor) {
-
- }
- };
-
- int main() {
- Actor& child = ChildActor();
-
- Cbor cbor;
-
- child.tell(child, TXD, 0, cbor);
- child >> child >> child;
-
- cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
-
- return 0;
- }
- */

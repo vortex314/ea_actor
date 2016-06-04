@@ -210,7 +210,7 @@ ActorRef MqttPublisher::create(ActorRef mqtt) {
 void MqttPublisher::sendPublish() {
 	uint8_t header = 0;
 	if ((_flags & MQTT_QOS_MASK) == MQTT_QOS0_FLAG) {
-		_state = ST_READY;
+//		_state = ST_READY;
 	} else if ((_flags & MQTT_QOS_MASK) == MQTT_QOS1_FLAG) {
 		header += MQTT_QOS1_FLAG;
 		setReceiveTimeout(MQTT_TIME_WAIT_REPLY);

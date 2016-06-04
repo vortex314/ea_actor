@@ -78,7 +78,7 @@ class MqttPublisher: public Actor {
 	void sendPubRel();
 	enum State {
 		ST_READY, ST_BUSY,
-	} _state;
+	} ;
 	Str _topic;
 	Bytes _message;
 	uint16_t _messageId;

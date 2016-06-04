@@ -19,7 +19,8 @@
 
 #=== Project specific definitions: sketch and list of needed libraries
 ESP_LIBS ?= /home/lieven/workspace/Arduino/libraries
-ESPTOOL = ../esp_tcp/tools/esptool.py #//TODO
+ESPTOOL = ../esp8266_tools/tools/esptool.py #//TODO
+RESET = ../esp8266_tools/tools/reset
 INCLUDE_DIRS ?= ../Common/inc . ./Actor ./esp8266
 CORE_DIR ?= $(ESP_LIBS)
 # USER_DIRS ?= $(ESP_LIBS)
@@ -177,10 +178,10 @@ upload: all
 	$(ESP_TOOL) $(UPLOAD_VERB) -cd $(UPLOAD_RESET) -cb $(UPLOAD_SPEED) -cp $(UPLOAD_PORT) -ca 0x00000 -cf $(MAIN_EXE) -cd nodemcu
 
 symbols : $(MAIN_ELF)
-	nm -C -n $(MAIN_ELF) > build/symbols.txt
+	nm -n --demangle -f sysv $(MAIN_ELF) > build/symbols.txt
 	
 flash: $(MAIN_EXE)
-#	/home/lieven/workspace/esp_tcp/tools/reset $(UPLOAD_PORT)
+	$(RESET) $(UPLOAD_PORT)
 #	$(ESP_TOOL) --port $(ESPPORT)  read_mac
 	$(ESPTOOL) --port $(UPLOAD_PORT)  read_flash  0x3F8000 0x100 dump.bin 
 	od --endian=little -X -c dump.bin > $(LOG)
@@ -191,7 +192,7 @@ flash: $(MAIN_EXE)
 		0x00000 $(MAIN_EXE) 
 #		0x3FC000 tools/esp_init_data_default.bin \
 #		0x3FE000 tools/blank.bin  
-	/home/lieven/workspace/esp_tcp/tools/reset $(UPLOAD_PORT)
+	$(RESET) $(UPLOAD_PORT)
 	minicom  -D $(UPLOAD_PORT) -C $(LOG)
 
 ota: all

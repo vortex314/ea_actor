@@ -20,9 +20,9 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1865799589" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
 							<builder buildPath="${workspace_loc:/ea_actor}" command="make" id="cdt.managedbuild.builder.gnu.cross.281951202" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.330785347" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
-								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.343696646" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" useByScannerDiscovery="false" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.debugging.level.135418578" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" useByScannerDiscovery="false" value="gnu.c.debugging.level.max" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.include.paths.1622553451" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.343696646" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.debugging.level.135418578" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.include.paths.1622553451" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/cores/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266WiFi/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266mDNS}&quot;"/>
@@ -31,22 +31,22 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/Actor}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\Data\lieven\mingw\include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Common/inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
-								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1339498969" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1339498969" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
 									<listOptionValue builtIn="false" value="ARDUINO"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.16840648" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.compiler.1684691015" name="Cross G++ Compiler" superClass="cdt.managedbuild.tool.gnu.cross.cpp.compiler">
-								<option id="gnu.cpp.compiler.option.optimization.level.860857690" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.debugging.level.310428508" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.include.paths.904402430" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+								<option id="gnu.cpp.compiler.option.optimization.level.860857690" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.debugging.level.310428508" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.include.paths.904402430" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/cores/esp8266"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266mDNS"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/ESP8266WiFi/src"/>
@@ -55,13 +55,13 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/variants/nodemcu"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/sdk/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/Actor}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\Data\lieven\mingw\include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Common/inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.preprocessor.def.1109015738" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.cpp.compiler.option.preprocessor.def.1109015738" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
 									<listOptionValue builtIn="false" value="ARDUINO"/>
 								</option>
@@ -89,6 +89,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1461950491" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -137,6 +138,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.897308332" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -161,6 +163,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.58934968" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -191,6 +194,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.737304301" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -224,13 +228,8 @@
 		</scannerConfigBuildInfo>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope" versionNumber="2">
-		<configuration configurationName="Release">
-			<resource resourceType="PROJECT" workspacePath="/ea_actor"/>
-		</configuration>
-		<configuration configurationName="Debug">
-			<resource resourceType="PROJECT" workspacePath="/ea_actor"/>
-		</configuration>
+	<storageModule moduleId="refreshScope" versionNumber="1">
+		<resource resourceType="PROJECT" workspacePath="/ea_actor"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets">
 		<buildTargets>

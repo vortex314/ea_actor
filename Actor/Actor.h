@@ -29,7 +29,7 @@ typedef enum {
 	ANY = 0xFF
 } Event;
 #define REPLY(xxx) (Event)(xxx + RESPONSE)
-#define MAX_ACTORS 10
+#define MAX_ACTORS 20
 
 class ActorRef;
 class Header {
@@ -146,6 +146,7 @@ protected:
 	static void logHeader(Header);
 public:
 	static Cbor _cborOut;
+	static Cbor _cborIn;
 	Actor(const char* name);
 	virtual ~Actor();
 	ActorRef self();
@@ -153,6 +154,7 @@ public:
 	void tellf(Header hdr, const char* fmt, ...);
 	void tell(Header header, Cbor& data);
 	void tell(ActorRef src, Event event, uint8_t detail);
+	static void send(const char* fmt,...);
 	static Actor& byIndex(uint8_t idx);
 	static Actor& dummy();
 	static void setup();

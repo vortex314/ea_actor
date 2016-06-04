@@ -7,7 +7,7 @@
 #include <Arduino.h>
 #include <Sys.h>
 
-uint64_t Sys::millis(){
+uint64_t Sys::millis(){ 
 	return ::millis();
 }
 
