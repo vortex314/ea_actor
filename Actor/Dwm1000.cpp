@@ -7,6 +7,9 @@
 #include <Arduino.h>
 #include <Dwm1000.h>
 #include <Json.h>
+extern "C" {
+#include "user_interface.h"
+}
 
 static Cbor out(100);
 
@@ -24,22 +27,33 @@ void Dwm1000::init() {
 }
 
 void Dwm1000::publish(uint8_t qos, const char* key, Str& value) {
-	_mqtt.tell(self(), PUBLISH, qos, out.putf("sB", key, &value));
+	_mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
 }
 
 void Dwm1000::onReceive(Header hdr, Cbor& data) {
 	Json json(20);
-	if (hdr.is(INIT))
-		init();
-	PT_BEGIN()
-	;
-	while (true) {
-		setReceiveTimeout(2000);
-		PT_WAIT_UNTIL(hdr.is(TIMEOUT));
 
-		json.add((uint64_t) millis());
-		publish(0, "system/time", json);
-		PT_WAIT_UNTIL(hdr.is(REPLY(PUBLISH),E_OK));
+	switch (hdr._event) {
+	case INIT: {
+		init();
+		setReceiveTimeout(10000);
+		break;
 	}
-PT_END()
+	case TIMEOUT: {
+		setReceiveTimeout(1000);
+		json.add((uint64_t) millis());
+		publish(0, "system/up_time", json);
+		json.clear();
+		json.add((uint64_t) system_get_free_heap_size());
+		publish(0, "system/heap_size", json);
+		break;
+	}
+	case REPLY(CONNECT): {
+		break;
+	}
+	default: {
+		unhandled(hdr);
+		break;
+	}
+	}
 }

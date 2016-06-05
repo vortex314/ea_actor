@@ -36,6 +36,8 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1339498969" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -60,6 +62,8 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1109015738" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -90,14 +94,18 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1461950491" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Actor" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="dwm1000"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Actor"/>
+						<entry excluding="dwm1000|driver|Actor" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="driver"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -122,9 +130,9 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.750431427" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
 							<builder buildPath="${workspace_loc:/ea_actor}/Release" id="cdt.managedbuild.builder.gnu.cross.1687207882" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.1220865671" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
-								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.624583008" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" useByScannerDiscovery="false" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.debugging.level.1406750156" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" useByScannerDiscovery="false" value="gnu.c.debugging.level.none" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.include.paths.532783835" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.624583008" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.debugging.level.1406750156" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.include.paths.532783835" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/cores/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266WiFi/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266mDNS}&quot;"/>
@@ -139,17 +147,19 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.preprocessor.def.symbols.897308332" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.c.compiler.option.preprocessor.def.symbols.897308332" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
 									<listOptionValue builtIn="false" value="ARDUINO"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.382711341" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.compiler.1841483408" name="Cross G++ Compiler" superClass="cdt.managedbuild.tool.gnu.cross.cpp.compiler">
-								<option id="gnu.cpp.compiler.option.optimization.level.1891099743" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.debugging.level.821743509" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.include.paths.693099438" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+								<option id="gnu.cpp.compiler.option.optimization.level.1891099743" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.debugging.level.821743509" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.include.paths.693099438" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/cores/esp8266}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266WiFi/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/home/lieven/workspace/Arduino/libraries/ESP8266mDNS}&quot;"/>
@@ -164,8 +174,10 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.preprocessor.def.58934968" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.cpp.compiler.option.preprocessor.def.58934968" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
 									<listOptionValue builtIn="false" value="ARDUINO"/>
 								</option>
@@ -195,14 +207,18 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/xtensa-lx106-elf/include/c++/4.8.2"/>
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.737304301" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Actor" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Actor"/>
+						<entry excluding="dwm1000|driver|Actor" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="dwm1000"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="driver"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

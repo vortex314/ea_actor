@@ -11,10 +11,13 @@
 #include <MqttMsg.h>
 #include <MqttConstants.h>
 
-#define TIME_KEEP_ALIVE 40000
-#define TIME_PING 20000
+#define TIME_KEEP_ALIVE 2000
+#define TIME_PING 1000
 #define MQTT_PUB_MAX_RETRIES 3
 #define MQTT_TIME_WAIT_REPLY 1000
+#define MQTT_TOPIC_MAX_LENGTH 40
+#define MQTT_VALUE_MAX_LENGTH	256
+#define MQTT_MSG_MAX_LENGTH (MQTT_VALUE_MAX_LENGTH+MQTT_TOPIC_MAX_LENGTH)
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
  * OUT : TXD(MQTT_PING),CONNECT
@@ -59,10 +62,11 @@ public:
  */
 class MqttConnector: public Actor {
 	const char* _clientId;
+	Str _prefix;
 	ActorRef _mqtt;
-	MqttConnector(ActorRef mqtt);
+	MqttConnector(ActorRef mqtt,const char* prefix);
 public:
-	static ActorRef create(ActorRef mqtt);
+	static ActorRef create(ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 	void init();
 };
@@ -73,19 +77,17 @@ public:
 class MqttPublisher: public Actor {
 	ActorRef _mqtt;
 	Str _prefix;
-	MqttPublisher(ActorRef mqtt);
+	MqttPublisher(ActorRef mqtt,const char* prefix);
 	void sendPublish();
 	void sendPubRel();
-	enum State {
-		ST_READY, ST_BUSY,
-	} ;
+	uint8_t _qos;
 	Str _topic;
 	Bytes _message;
 	uint16_t _messageId;
-	uint32_t _flags;
+//	uint32_t _flags;
 	uint16_t _retries;
 public:
-	static ActorRef create(ActorRef mqtt);
+	static ActorRef create(ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 };
 /*
@@ -96,7 +98,8 @@ class MqttSubscriber: public Actor {
 	ActorRef _mqtt;
 	ActorRef _sender;
 
-	MqttSubscriber(ActorRef mqtt);
+	MqttSubscriber(ActorRef mqtt,const char* prefix);
+	Str _prefix;
 	Str _topic;
 	Bytes _message;
 	uint32_t _flags;
@@ -108,7 +111,7 @@ class MqttSubscriber: public Actor {
 	void sendPubAck();
 	void sendSubscribe();
 public:
-	static ActorRef create(ActorRef mqtt);
+	static ActorRef create(ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 };
 

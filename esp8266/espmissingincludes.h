@@ -18,9 +18,9 @@
 int atoi(const char *nptr);
 void ets_delay_us(long us);
 void ets_install_putc1(void *routine);
-void ets_isr_attach(int intr, void *handler, void *arg);
+/* void ets_isr_attach(int intr, void *handler, void *arg);
 void ets_isr_mask(unsigned intr);
-void ets_isr_unmask(unsigned intr);
+void ets_isr_unmask(unsigned intr);*/
 int ets_memcmp(const void *s1, const void *s2, size_t n);
 void *ets_memcpy(void *dest, const void *src, size_t n);
 void *ets_memset(void *s, int c, size_t n);
@@ -38,10 +38,10 @@ void ets_timer_setfn(ETSTimer *t, ETSTimerFunc *fn, void *parg);
 int os_printf(const char *format, ...)  __attribute__ ((format (printf, 1, 2)));
 int os_snprintf(char *str, size_t size, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
 void pvPortFree(void *ptr);
-void *pvPortMalloc(size_t xWantedSize);
+//void *pvPortMalloc(size_t xWantedSize);
 void *pvPortZalloc(size_t);
-void uart_div_modify(int no, unsigned int freq);
-void vPortFree(void *ptr);
+//void uart_div_modify(int no, unsigned int freq);
+//void vPortFree(void *ptr);
 void *vPortMalloc(size_t xWantedSize);
 void ets_intr_lock(void);
 void ets_intr_unlock(void);

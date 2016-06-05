@@ -138,10 +138,8 @@ void Tcp::logConn(const char* s, void* arg) {
 	return;
 	if (pconn) {
 //	LOGF(" %X:%X %X", this, pconn, pconn->reverse);
-		LOGF(" %s - tcp :  %x  , ip : %d.%d.%d.%d:%d  ", s, pconn->reverse,
-				pconn->proto.tcp->remote_ip[0], pconn->proto.tcp->remote_ip[1],
-				pconn->proto.tcp->remote_ip[2], pconn->proto.tcp->remote_ip[3],
-				pconn->proto.tcp->remote_port);
+		LOGF(" %s - tcp :  %x  , ip : %d.%d.%d.%d:%d  ",
+				s, pconn->reverse, pconn->proto.tcp->remote_ip[0], pconn->proto.tcp->remote_ip[1], pconn->proto.tcp->remote_ip[2], pconn->proto.tcp->remote_ip[3], pconn->proto.tcp->remote_port);
 	}
 }
 
@@ -215,7 +213,7 @@ void Tcp::connectCb(void* arg) {
 
 	struct espconn* pconn = (struct espconn*) arg;
 
-	Tcp* pTcp = findTcp(pconn);	// if found it's TcpClient
+	Tcp* pTcp = findTcp(pconn); // if found it's TcpClient
 
 	if (pTcp == 0) {
 		pTcp = findFreeTcp(pconn);
@@ -238,10 +236,8 @@ void Tcp::connectCb(void* arg) {
 		pTcp->_lastRxd = Sys::millis();
 	} else {
 		LOGF(" no free TCP : disconnecting %X ", pconn);
-		LOGF("  tcp :  %x  , ip : %d.%d.%d.%d:%d  ", pconn->reverse,
-				pconn->proto.tcp->remote_ip[0], pconn->proto.tcp->remote_ip[1],
-				pconn->proto.tcp->remote_ip[2], pconn->proto.tcp->remote_ip[3],
-				pconn->proto.tcp->remote_port);
+		LOGF("  tcp :  %x  , ip : %d.%d.%d.%d:%d  ",
+				pconn->reverse, pconn->proto.tcp->remote_ip[0], pconn->proto.tcp->remote_ip[1], pconn->proto.tcp->remote_ip[2], pconn->proto.tcp->remote_ip[3], pconn->proto.tcp->remote_port);
 		espconn_disconnect(pconn);
 	}
 	return;
@@ -286,6 +282,9 @@ void Tcp::send() { // send buffered data, max 100 bytes
 		if (_buffer.length() == 0)
 			return;
 		int8_t erc = espconn_sent(_conn, _buffer.data(), _buffer.length());
+		if (erc) {
+			LOGF(" espconn_sent() =  %d ", erc);
+		}
 		if (erc == 0) {
 			_bytesTxd += _buffer.length();
 			_buffer.clear();
@@ -330,9 +329,8 @@ void Tcp::recvCb(void* arg, char *pdata, unsigned short len) {
 //		bytes.toHex(str);
 //		LOGF(" received : %s ",str.c_str());
 		Erc erc;
-		Cbor cbor(256);
-		cbor.add(bytes);
-		pTcp->right().tell(Header(pTcp->right(), pTcp->self(), RXD, 0), cbor);
+		pTcp->right().tell(Header(pTcp->right(), pTcp->self(), RXD, 0),
+				_cborOut.putf("B", &bytes));
 //		if (erc = Msg::queue().putf("uuB", pTcp, SIG_RXD, &bytes)) {
 //			pTcp->_overflowRxd++;
 //		}
@@ -355,9 +353,8 @@ void Tcp::dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg) {
 		LOGF("DNS: Found, but got no ip, try to reconnect");
 		return;
 	};
-	LOGF("DNS: found ip %d.%d.%d.%d", *((uint8 * ) &ipaddr->addr),
-			*((uint8 * ) &ipaddr->addr + 1), *((uint8 * ) &ipaddr->addr + 2),
-			*((uint8 * ) &ipaddr->addr + 3));
+	LOGF("DNS: found ip %d.%d.%d.%d",
+			*((uint8 * ) &ipaddr->addr), *((uint8 * ) &ipaddr->addr + 1), *((uint8 * ) &ipaddr->addr + 2), *((uint8 * ) &ipaddr->addr + 3));
 
 //	if (pTcp->_remote_ip.addr == 0 && ipaddr->addr != 0) {
 	memcpy(pTcp->_conn->proto.tcp->remote_ip, &ipaddr->addr, 4);
@@ -373,8 +370,7 @@ void Tcp::disconnect() {
 }
 /*
  *
- */
-bool Tcp::isConnected() {
+ */bool Tcp::isConnected() {
 	return _connected;
 }
 //____________________________________________________________
@@ -395,8 +391,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 	CONNECTING: {
 		LOGF("CONNECTING");
 		while (true) {
-			PT_YIELD()
-			;
+			PT_YIELD();
 			if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
 				right().tell(self(), REPLY(CONNECT), 0);
 				goto CONNECTED;
@@ -410,8 +405,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		LOGF("CONNECTED");
 		while (true) {
 			setReceiveTimeout(5000);
-			PT_YIELD()
-			;
+			PT_YIELD();
 			if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
 				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto CONNECTING;
@@ -476,15 +470,14 @@ _conn->type = ESPCONN_TCP;
 _conn->state = ESPCONN_NONE;
 _conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
 ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
-_connected = true;		// don't reallocate master client
+_connected = true; // don't reallocate master client
 }
 
 void TcpClient::onReceive(Header hdr, Cbor& cbor) {
 PT_BEGIN()
 WIFI_DISCONNECTED: {
 	while (true) {
-		PT_YIELD()
-		;
+		PT_YIELD();
 		if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 			LOGF("TcpClient started. %x", this);
 			goto CONNECTING;
@@ -494,8 +487,7 @@ WIFI_DISCONNECTED: {
 CONNECTING: {
 	while (true) {
 		connect();
-		PT_YIELD()
-		;
+		PT_YIELD();
 		if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
 			right().tell(self(), REPLY(CONNECT), 0);
 			goto CONNECTED;
@@ -509,9 +501,8 @@ CONNECTING: {
 CONNECTED: {
 	while (true) {
 		setReceiveTimeout(5000);
-		PT_YIELD()
-		;
-		if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {// tcp link gone, callback was called
+		PT_YIELD();
+		if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
 			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto CONNECTING;
 		} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
@@ -552,7 +543,7 @@ ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
 _local_port = 23;
 _conn->reverse = (Tcp*) this;
 logConn(__FUNCTION__, _conn);
-_connected = true;	// to allocate TCP instance
+_connected = true; // to allocate TCP instance
 }
 
 //------------------------------------------------------------------------
@@ -569,8 +560,7 @@ PT_BEGIN()
 ;
 WIFI_DISCONNECT: {
 while (true) {
-	PT_YIELD()
-	;
+	PT_YIELD();
 	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 		LOGF("TcpServer started. %x", this);
 		listen();
@@ -582,8 +572,7 @@ CONNECTING: {
 while (true) {
 
 	setReceiveTimeout(2000);
-	PT_YIELD()
-	;
+	PT_YIELD();
 	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
 		listTcp();
 		goto WIFI_DISCONNECT;

@@ -232,6 +232,10 @@ uint8_t  MqttMsg::type() {
 	return _header & MQTT_TYPE_MASK;
 }
 
+uint8_t  MqttMsg::header() {
+	return _header ;
+}
+
 uint8_t  MqttMsg::qos() {
 	return _header & MQTT_QOS_MASK;
 }

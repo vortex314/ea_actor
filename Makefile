@@ -30,7 +30,9 @@ SKETCH ?= main.cpp
 LIBS ?= $(ESP_LIBS)/Wire \
        ./Actor \
         ../Common/src \
-        ../Common/inc 
+        ../Common/inc \
+        ./driver \
+        ./dwm1000
 #       $(ESP_LIBS)/ESP8266WiFi \
 #       $(ESP_LIBS)/ESP8266mDNS \
 #       $(ESP_LIBS)/ESP8266WebServer \
