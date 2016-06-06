@@ -78,6 +78,11 @@ bool Header::is(uint8_t event, uint8_t detail) {
 	}
 	return false;
 }
+
+bool Header::is(ActorRef src, uint8_t event) {
+	return src.idx() == _src && event == _event;
+}
+
 bool Header::matches(ActorRef dst, ActorRef src, Event event, uint8_t detail) {
 	if (dst.idx() == ANY || dst.idx() == _dst) {
 		if (src.idx() == ANY || src.idx() == _src) {
@@ -229,15 +234,15 @@ void Actor::eventLoop() {
 				header._dst = i;
 				_cborIn.offset(0);
 				_cborOut.clear();
-				LOGHEADER(header,_cborIn);
+				LOGHEADER(header, _cborIn);
 				Actor::byIndex(i).onReceive(header, _cborIn);
 			}
 		} else if (header._dst < _count) {
-			LOGHEADER(header,_cborIn);
+			LOGHEADER(header, _cborIn);
 			_cborOut.clear();
 			Actor::byIndex(header._dst).onReceive(header, _cborIn);
 		} else {
-			LOGHEADER(header,_cborIn);
+			LOGHEADER(header, _cborIn);
 			LOGF(" invalid dst : %d", header._dst);
 		}
 	};

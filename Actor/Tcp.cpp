@@ -84,13 +84,14 @@ bool Tcp::match(struct espconn* pconn, Tcp* pTcp) {
 	/*	LOGF(" compare %X:%d : %X:%d ", *((uint32_t* )pTcp->_remote_ip.b),
 	 pTcp->_remote_port, *((uint32_t* )pconn->proto.tcp->remote_ip),
 	 pconn->proto.tcp->remote_port);*/
-	if (pTcp->getType() == CLIENT && pTcp->_conn == pconn)
-		return true;
 
 	if (pTcp->getType() == LIVE || pTcp->getType() == CLIENT)
 		if (pTcp->_remote_port == pconn->proto.tcp->remote_port)
 			if (memcmp(pTcp->_remote_ip.b, pconn->proto.tcp->remote_ip, 4) == 0)
 				return true;
+	if (pTcp->getType() == CLIENT && pTcp->_conn == pconn)
+		return true;
+
 	return false;
 }
 
@@ -269,9 +270,10 @@ void Tcp::disconnectCb(void* arg) {
 		LOGF("connection not found");
 	return;
 }
-
+enum { READY,SENDING } sendState=READY;
 void Tcp::send() { // send buffered data, max 100 bytes
-	while (true) {
+
+	if (sendState==READY) {
 		if (_buffer.length()) {
 			// retry send same data
 		} else {
@@ -283,33 +285,29 @@ void Tcp::send() { // send buffered data, max 100 bytes
 			return;
 		int8_t erc = espconn_sent(_conn, _buffer.data(), _buffer.length());
 		if (erc) {
-			LOGF(" espconn_sent() =  %d ", erc);
-		}
-		if (erc == 0) {
+			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",_conn, erc,_buffer.length());
+			return;
+		} else {
+			sendState=SENDING;
 			_bytesTxd += _buffer.length();
 			_buffer.clear();
-//		LOGF(" TCP:send %d bytes", length);
-		} else {
-			return;
 		}
 	}
 }
 
 void Tcp::writeFinishCb(void* arg) {
 	struct espconn* pconn = (struct espconn*) arg;
-//	Tcp *pTcp = getInstance(pconn);
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
 	pTcp->send();
-//	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
 
 void Tcp::sendCb(void *arg) {
 	struct espconn* pconn = (struct espconn*) arg;
-//	Tcp *pTcp = getInstance(pconn);not
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
+	sendState = READY;
 	pTcp->send();
 	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
@@ -406,12 +404,15 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		while (true) {
 			setReceiveTimeout(5000);
 			PT_YIELD();
-			if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
+			if (hdr.is(self(),  REPLY(DISCONNECT))) { // tcp link gone, callback was called
 				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto CONNECTING;
-			} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
+			} else if (hdr.is(left(), REPLY(DISCONNECT))) { // wifi link gone
 				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto WIFI_DISCONNECTED;
+			} else if (hdr.is(right(), DISCONNECT)) { // wifi link gone
+				disconnect();
+				goto CONNECTING;
 			} else if (timeout()) {
 				LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
 				if ((_lastRxd + 5000) < Sys::millis()) {

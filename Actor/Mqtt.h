@@ -38,6 +38,7 @@ class Mqtt: public Actor {
 	Mqtt(const char *prefix);
 	static MqttMsg _mqttIn;
 	static MqttMsg _mqttOut;
+	bool _connected;
 public:
 
 	virtual ~Mqtt();

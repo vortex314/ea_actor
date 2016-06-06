@@ -166,6 +166,7 @@ void DWM1000_Anchor::resetChip() {
 bool DWM1000_Anchor::interrupt_detected = false;
 uint32_t DWM1000_Anchor::_status_reg = 0;
 static int interruptCount = 0;
+
 ICACHE_RAM_ATTR void DWM1000_Anchor::my_dwt_isr() {
 	interrupt_detected = true;
 	_status_reg = dwt_read32bitreg(SYS_STATUS_ID);
@@ -296,10 +297,10 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 		WAIT_POLL: {
 			dwt_setrxtimeout(0); /* Clear reception timeout to start next ranging process. */
 			dwt_rxenable(0); /* Activate reception immediately. */
-//			dwt_setinterrupt(DWT_INT_RFCG, 1);	// enable RXD interrupt
+			dwt_setinterrupt(DWT_INT_RFCG, 1);	// enable RXD interrupt
 
 			while (true) { /* Poll for reception of a frame or error/timeout. See NOTE 7 below. */
-				setReceiveTimeout(5000);/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
+				setReceiveTimeout(200);/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 				clearInterrupt();
 				PT_YIELD_UNTIL(hdr.is(TIMEOUT) || isInterruptDetected());
 				status_reg = _status_reg;
@@ -308,6 +309,11 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 				json.add(polls++);
 				Bytes* js=&json;
 				_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/polls",js));
+
+				json.clear();
+				json.add(interruptCount);
+				_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/interrupts",js));
+
 				status_reg = dwt_read32bitreg(SYS_STATUS_ID);
 				LOGF( " IRQ pin : %X status_reg DWM1000  %X",
 						digitalRead(D2), status_reg);

@@ -58,6 +58,10 @@ void MqttFramer::onReceive(Header hdr, Cbor& cbor) {
 			right().tell(self(), REPLY(TXD), 0);
 			break;
 		}
+		case DISCONNECT: {
+			left().tell(self(), DISCONNECT, 0);
+			break;
+			}
 		case TXD: {
 			left().tell(Header(left(), self(), TXD, 0), cbor);
 			break;

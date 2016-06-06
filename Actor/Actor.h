@@ -54,6 +54,7 @@ public:
 	inline bool is(uint8_t event) {
 		return _event == event;
 	}
+	bool is(ActorRef src,uint8_t event);
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
