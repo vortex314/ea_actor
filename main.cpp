@@ -9,7 +9,8 @@
 #include <Config.h>
 #include <pins_arduino.h>
 #include <DWM1000Anchor.h>
-#include <Dwm1000.h>
+#include <DWM1000Tag.h>
+#include <System.h>
 //#include <PubSubClient.h>
 
 ActorRef ledBlinker;
@@ -19,6 +20,8 @@ ActorRef mqtt;
 ActorRef mqttFramer;
 ActorRef dwm1000;
 ActorRef config;
+
+#define TAG
 
 extern "C" void setup(void) {
 	Serial.begin(115200);
@@ -30,13 +33,21 @@ extern "C" void setup(void) {
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
 	tcpClient = TcpClient::create("test.mosquitto.org", 1883);
-	mqtt = Mqtt::create("anchor_1/");
 	mqttFramer = MqttFramer::create();
 	config = Config::create();
 
-	wifi >> tcpClient >> mqttFramer >> mqtt >> ledBlinker;
+#ifdef TAG
+	mqtt = Mqtt::create("tag_1/");
+	dwm1000 = DWM1000_Tag::create(mqtt);
+#else
+	mqtt = Mqtt::create("anchor_1/");
 	dwm1000 = DWM1000_Anchor::create(mqtt);
-	Dwm1000::create(mqtt);
+#endif
+	System::create(mqtt);
+
+	wifi >> tcpClient >> mqttFramer >> mqtt >> ledBlinker;
+
+
 
 	Actor::broadcast(Actor::dummy(), INIT, 0);
 

@@ -177,11 +177,10 @@ WAITING: { // wait between PING's
 	if (hdr.is(REPLY(DISCONNECT)))
 		goto DISCONNECTED;
 }
-PINGING: {
+PINGING: {	// retyr 3 ping's max
 	_retries = 1;
 	while (_retries < 3) {
-		_mqtt.tell(self(), PUBLISH, 0,
-				_cborOut.putf("ss", "system/online", "true"));
+
 		_mqttOut.PingReq();
 		_mqtt.tell(self(), TXD, 0, _cborOut.putf("B", (Bytes*) &_mqttOut));
 		setReceiveTimeout(TIME_PING);
@@ -193,8 +192,7 @@ PINGING: {
 			goto WAITING;
 		} else if (hdr.is(TIMEOUT)) {
 			_retries++;
-		};
-		if (hdr.is(DISCONNECT))
+		} else if (hdr.is(DISCONNECT))
 			goto DISCONNECTED;
 	}
 	_mqtt.tell(self(), DISCONNECT, 0);

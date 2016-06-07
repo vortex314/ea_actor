@@ -56,7 +56,11 @@ protected:
 	uint16_t _remote_port;
 	uint16_t _local_port;
 	struct espconn* _conn;
-	char _host[64];bool _connected;
+	char _host[64];
+	enum {
+		READY, SENDING
+	} _sendState ;//
+	bool _connected;
 
 private:
 
@@ -103,8 +107,8 @@ public:
 	uint32_t count(); //
 	uint32_t used(); //
 
-	void registerCb(struct espconn* pconn);	//
-	static void connectCb(void* arg);	//
+	void registerCb(struct espconn* pconn); //
+	static void connectCb(void* arg); //
 	static void reconnectCb(void* arg, int8 err); // mqtt_tcpclient_recon_cb(void *arg, sint8 errType)
 	static void disconnectCb(void* arg); //
 	static void dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg); //
@@ -112,7 +116,7 @@ public:
 	static void sendCb(void* arg); //
 	static void writeFinishCb(void* arg); //
 
-	void send();	//
+	void send(); //
 	Erc write(Bytes& bytes); //
 	Erc write(uint8_t b); //
 	Erc write(uint8_t* pb, uint32_t length); //

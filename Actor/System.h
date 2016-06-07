@@ -10,13 +10,13 @@
 
 #include <Actor.h>
 
-class Dwm1000: public Actor {
+class System: public Actor {
 	ActorRef _mqtt;
-	Dwm1000(ActorRef mqtt);
+	System(ActorRef mqtt);
 public:
-	virtual ~Dwm1000();
+	virtual ~System();
 	static ActorRef create(ActorRef mqtt) {
-		return ActorRef(new Dwm1000(mqtt));
+		return ActorRef(new System(mqtt));
 	}
 	void init();
 	void onReceive(Header hdr, Cbor& data);

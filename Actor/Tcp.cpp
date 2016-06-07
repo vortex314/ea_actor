@@ -29,6 +29,7 @@ Tcp::Tcp() :
 	_local_port = 0;
 	_lastRxd = Sys::millis();
 	reg();
+	_sendState = READY;
 }
 
 Tcp::~Tcp() {
@@ -225,13 +226,24 @@ void Tcp::connectCb(void* arg) {
 		pTcp->loadEspconn(pconn);
 		pTcp->logConn(__FUNCTION__, arg);
 		pTcp->registerCb(pconn);
+		pTcp->_sendState = READY;
 
-		espconn_set_opt(pconn, ESPCONN_NODELAY);
-		espconn_set_opt(pconn, ESPCONN_COPY);
-		espconn_set_keepalive(pconn, ESPCONN_KEEPALIVE, (void*) 1);
-		espconn_set_keepalive(pconn, ESPCONN_KEEPIDLE, (void*) 1);
-		espconn_regist_time(pconn, 100, 0);
+		/*		uint32_t keeplive;
 
+		 espconn_set_opt(pesp_conn, ESPCONN_KEEPALIVE); // enable TCP keep alive
+
+		 //set keepalive: 75s = 60 + 5*3
+		 keeplive = 60;
+		 espconn_set_keepalive(pesp_conn, ESPCONN_KEEPIDLE, &keeplive);
+		 keeplive = 5;
+		 espconn_set_keepalive(pesp_conn, ESPCONN_KEEPINTVL, &keeplive);
+		 keeplive = 3; //try times
+		 espconn_set_keepalive(pesp_conn, ESPCONN_KEEPCNT, &keeplive);  */
+//		espconn_set_opt(pconn, ESPCONN_NODELAY);
+//		espconn_set_opt(pconn, ESPCONN_COPY);
+//		espconn_set_keepalive(pconn, ESPCONN_KEEPALIVE, (void*) 1);
+//		espconn_set_keepalive(pconn, ESPCONN_KEEPIDLE, (void*) 1);
+//		espconn_regist_time(pconn, 100, 0);
 		pTcp->self().tell(pTcp->self(), REPLY(CONNECT), 0);
 		pTcp->_connected = true;
 		pTcp->_lastRxd = Sys::millis();
@@ -248,6 +260,7 @@ void Tcp::reconnectCb(void* arg, int8_t err) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
+	pTcp->_sendState = READY;
 	return;
 
 	LOGF("TCP: Reconnect %s:%d err : %d", pTcp->_host, pTcp->_remote_port, err);
@@ -270,10 +283,10 @@ void Tcp::disconnectCb(void* arg) {
 		LOGF("connection not found");
 	return;
 }
-enum { READY,SENDING } sendState=READY;
+
 void Tcp::send() { // send buffered data, max 100 bytes
 
-	if (sendState==READY) {
+	if (_sendState == READY) {
 		if (_buffer.length()) {
 			// retry send same data
 		} else {
@@ -285,10 +298,11 @@ void Tcp::send() { // send buffered data, max 100 bytes
 			return;
 		int8_t erc = espconn_sent(_conn, _buffer.data(), _buffer.length());
 		if (erc) {
-			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",_conn, erc,_buffer.length());
+			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",
+					_conn, erc, _buffer.length());
 			return;
 		} else {
-			sendState=SENDING;
+			_sendState = SENDING;
 			_bytesTxd += _buffer.length();
 			_buffer.clear();
 		}
@@ -299,7 +313,9 @@ void Tcp::writeFinishCb(void* arg) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
+	pTcp->_sendState = READY;
 	pTcp->send();
+	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
 
@@ -307,9 +323,7 @@ void Tcp::sendCb(void *arg) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
-	sendState = READY;
-	pTcp->send();
-	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
+
 	return;
 }
 
@@ -392,6 +406,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 			PT_YIELD();
 			if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
 				right().tell(self(), REPLY(CONNECT), 0);
+				_sendState=READY;
 				goto CONNECTED;
 			} else if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {
 				right().tell(self(), REPLY(DISCONNECT), 0);
@@ -404,7 +419,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		while (true) {
 			setReceiveTimeout(5000);
 			PT_YIELD();
-			if (hdr.is(self(),  REPLY(DISCONNECT))) { // tcp link gone, callback was called
+			if (hdr.is(self(), REPLY(DISCONNECT))) { // tcp link gone, callback was called
 				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto CONNECTING;
 			} else if (hdr.is(left(), REPLY(DISCONNECT))) { // wifi link gone

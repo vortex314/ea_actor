@@ -5,7 +5,7 @@
  *      Author: 600104947
  */
 #include <Arduino.h>
-#include <Dwm1000.h>
+#include <System.h>
 #include <Json.h>
 extern "C" {
 #include "user_interface.h"
@@ -13,24 +13,24 @@ extern "C" {
 
 static Cbor out(100);
 
-Dwm1000::Dwm1000(ActorRef mqtt) :
-		Actor("DWM1000") {
+System::System(ActorRef mqtt) :
+		Actor("System") {
 	_mqtt = mqtt;
 }
 
-Dwm1000::~Dwm1000() {
+System::~System() {
 
 }
 
-void Dwm1000::init() {
+void System::init() {
 
 }
 
-void Dwm1000::publish(uint8_t qos, const char* key, Str& value) {
+void System::publish(uint8_t qos, const char* key, Str& value) {
 	_mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
 }
 
-void Dwm1000::onReceive(Header hdr, Cbor& data) {
+void System::onReceive(Header hdr, Cbor& data) {
 	Json json(20);
 
 	switch (hdr._event) {
@@ -41,6 +41,10 @@ void Dwm1000::onReceive(Header hdr, Cbor& data) {
 	}
 	case TIMEOUT: {
 		setReceiveTimeout(1000);
+		json.clear();
+		json.add(true);
+		publish(0, "system/online", json);
+		json.clear();
 		json.add((uint64_t) millis());
 		publish(0, "system/up_time", json);
 		json.clear();
