@@ -12,7 +12,7 @@
 class DWM1000_Tag: public Actor {
 	uint32_t _count;
 	static uint32_t _status_reg;
-	ActorRef _mqtt;
+	ActorRef _mqtt;bool _mqttConnected;
 public:
 	DWM1000_Tag(ActorRef mqtt);
 	static ActorRef create(ActorRef mqtt);
@@ -21,11 +21,13 @@ public:
 	void init();
 	void resetChip();
 	void initSpi();
-	void onReceive(Header ,Cbor&);
+	void sendPoll();
+	void sendFinal();
+	void onReceive(Header, Cbor&);
+	bool subscribed(Header hdr);
 	void enableIsr();
-	static bool interrupt_detected ;
-	static void my_dwt_isr();
-	bool isInterruptDetected();
+	static bool interrupt_detected;
+	static void my_dwt_isr();bool isInterruptDetected();
 	void clearInterrupt();
 };
 

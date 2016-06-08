@@ -13,6 +13,7 @@
 class System: public Actor {
 	ActorRef _mqtt;
 	System(ActorRef mqtt);
+	bool _mqttConnected;
 public:
 	virtual ~System();
 	static ActorRef create(ActorRef mqtt) {
@@ -20,6 +21,7 @@ public:
 	}
 	void init();
 	void onReceive(Header hdr, Cbor& data);
+	bool subscribed(Header hdr);
 	void publish(uint8_t qos,const char* key,Str& value);
 };
 

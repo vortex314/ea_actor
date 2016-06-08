@@ -13,11 +13,7 @@
 #include <CborQueue.h>
 
 typedef enum {
-	INIT = 0,
-	TIMEOUT,
-	STOP,
-	RESTART,
-	CONFIG,	// detail =0, initial params in payload, =1 , load config from flash again
+	INIT = 0, TIMEOUT, STOP, RESTART, CONFIG, // detail =0, initial params in payload, =1 , load config from flash again
 	TXD,
 	RXD,
 	CONNECT,
@@ -48,13 +44,16 @@ public:
 	}
 	Header(ActorRef dst, ActorRef src, Event event, uint8_t detail);
 	Header(int dst, int src, Event event, uint8_t detail); //
-	bool matches(ActorRef dst, ActorRef src, Event event, uint8_t detail); //
-	bool matches(int dst, int src, Event event, uint8_t detail); //
+	bool is(ActorRef dst, ActorRef src, Event event, uint8_t detail); //
+	bool is(int dst, int src, Event event, uint8_t detail); //
 	bool is(uint8_t event, uint8_t detail); //
+	bool is(ActorRef dst,ActorRef src,uint8_t event, uint8_t detail); //
 	inline bool is(uint8_t event) {
 		return _event == event;
 	}
-	bool is(ActorRef src,uint8_t event);
+	bool is(ActorRef src, uint8_t event);
+	Header& src(ActorRef);
+	Header& dst(ActorRef);
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
@@ -113,8 +112,8 @@ public:
 	void delegate(Header header, Cbor& data); // handle by another onReceive, keep header
 	void route(Header, Cbor&); // change destination and put back on queue
 	void tell(ActorRef src, Event event, uint8_t detail);
-	void tell(ActorRef src, Event event, uint8_t detail,Cbor& cbor);
-	void reply(Header hdr,Cbor& cbor);
+	void tell(ActorRef src, Event event, uint8_t detail, Cbor& cbor);
+	void reply(Header hdr, Cbor& cbor);
 	ActorRef operator>>(ActorRef ref);
 	uint8_t idx() {
 		return _idx;
@@ -155,7 +154,7 @@ public:
 	void tellf(Header hdr, const char* fmt, ...);
 	void tell(Header header, Cbor& data);
 	void tell(ActorRef src, Event event, uint8_t detail);
-	static void send(const char* fmt,...);
+	static void send(const char* fmt, ...);
 	static Actor& byIndex(uint8_t idx);
 	static Actor& dummy();
 	static void setup();
@@ -167,9 +166,10 @@ public:
 
 	uint8_t idx();
 	const char* path();
-	static void broadcast(Actor& src, Event event, uint8_t detail);
+	static void broadcast(ActorRef src, Event event, uint8_t detail);
 	virtual void onReceive(Header header, Cbor& data);
 	virtual void poll();
+	virtual bool subscribed(Header h);
 	void unhandled(Header header);
 
 	ActorRef left() {
@@ -181,7 +181,5 @@ public:
 	bool timeout();
 	void setReceiveTimeout(uint32_t time);
 };
-
-
 
 #endif /* ACTOR_H_ */

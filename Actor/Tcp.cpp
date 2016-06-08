@@ -13,7 +13,7 @@
 Tcp* Tcp::_first = 0;
 
 Tcp::Tcp() :
-		Actor("Tcp"), _txd(256), _buffer(100) {
+		Actor("Tcp"), _txd(1024), _buffer(1024) {
 	LOGF("this : %X ", this);
 	_type = LIVE;
 	_next = 0;
@@ -245,6 +245,8 @@ void Tcp::connectCb(void* arg) {
 //		espconn_set_keepalive(pconn, ESPCONN_KEEPIDLE, (void*) 1);
 //		espconn_regist_time(pconn, 100, 0);
 		pTcp->self().tell(pTcp->self(), REPLY(CONNECT), 0);
+		pTcp->_buffer.clear();
+		pTcp->_txd.clear();
 		pTcp->_connected = true;
 		pTcp->_lastRxd = Sys::millis();
 	} else {
@@ -261,6 +263,8 @@ void Tcp::reconnectCb(void* arg, int8_t err) {
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
 	pTcp->_sendState = READY;
+	pTcp->_buffer.clear();
+	pTcp->_txd.clear();
 	return;
 
 	LOGF("TCP: Reconnect %s:%d err : %d", pTcp->_host, pTcp->_remote_port, err);
@@ -313,9 +317,7 @@ void Tcp::writeFinishCb(void* arg) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
-	pTcp->_sendState = READY;
-	pTcp->send();
-	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
+
 	return;
 }
 
@@ -323,7 +325,9 @@ void Tcp::sendCb(void *arg) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	pTcp->logConn(__FUNCTION__, arg);
-
+	pTcp->_sendState = READY;
+	pTcp->send();
+	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
 
@@ -395,7 +399,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 	;
 	WIFI_DISCONNECTED: {
 		while (true) {
-			PT_YIELD_UNTIL(hdr.matches(left(), self(), REPLY(CONNECT), ANY));
+			PT_YIELD_UNTIL(hdr.is(left(), self(), REPLY(CONNECT), ANY));
 //			LOGF("Tcp started. %x", this);
 			goto CONNECTING;
 		}
@@ -404,11 +408,11 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 		LOGF("CONNECTING");
 		while (true) {
 			PT_YIELD();
-			if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
+			if (hdr.is(self(), self(), REPLY(CONNECT), 0)) {
 				right().tell(self(), REPLY(CONNECT), 0);
 				_sendState=READY;
 				goto CONNECTED;
-			} else if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {
+			} else if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) {
 				right().tell(self(), REPLY(DISCONNECT), 0);
 				goto WIFI_DISCONNECTED;
 			}
@@ -494,7 +498,7 @@ PT_BEGIN()
 WIFI_DISCONNECTED: {
 	while (true) {
 		PT_YIELD();
-		if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
+		if (hdr.is(self(), left(), REPLY(CONNECT), 0)) {
 			LOGF("TcpClient started. %x", this);
 			goto CONNECTING;
 		}
@@ -504,10 +508,10 @@ CONNECTING: {
 	while (true) {
 		connect();
 		PT_YIELD();
-		if (hdr.matches(self(), self(), REPLY(CONNECT), 0)) {
+		if (hdr.is(self(), self(), REPLY(CONNECT), 0)) {
 			right().tell(self(), REPLY(CONNECT), 0);
 			goto CONNECTED;
-		} else if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) {
+		} else if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) {
 			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto WIFI_DISCONNECTED;
 		}
@@ -518,10 +522,10 @@ CONNECTED: {
 	while (true) {
 		setReceiveTimeout(5000);
 		PT_YIELD();
-		if (hdr.matches(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
+		if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
 			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto CONNECTING;
-		} else if (hdr.matches(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
+		} else if (hdr.is(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
 			right().tell(self(), REPLY(DISCONNECT), 0);
 			goto WIFI_DISCONNECTED;
 		} else if (hdr.is(TXD)) {
@@ -577,7 +581,7 @@ PT_BEGIN()
 WIFI_DISCONNECT: {
 while (true) {
 	PT_YIELD();
-	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
+	if (hdr.is(self(), left(), REPLY(CONNECT), 0)) {
 		LOGF("TcpServer started. %x", this);
 		listen();
 		goto CONNECTING;
@@ -589,7 +593,7 @@ while (true) {
 
 	setReceiveTimeout(2000);
 	PT_YIELD();
-	if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) {
+	if (hdr.is(self(), left(), REPLY(CONNECT), 0)) {
 		listTcp();
 		goto WIFI_DISCONNECT;
 	}

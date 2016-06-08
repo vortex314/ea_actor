@@ -16,10 +16,18 @@ static Cbor out(100);
 System::System(ActorRef mqtt) :
 		Actor("System") {
 	_mqtt = mqtt;
+	_mqttConnected=false;
 }
 
 System::~System() {
 
+}
+
+//___________________________________________________
+//
+bool System::subscribed(Header hdr) {
+	return Actor::subscribed(hdr) || hdr.is(_mqtt, REPLY(CONNECT))
+			|| hdr.is(_mqtt, REPLY(DISCONNECT));
 }
 
 void System::init() {
@@ -27,12 +35,21 @@ void System::init() {
 }
 
 void System::publish(uint8_t qos, const char* key, Str& value) {
-	_mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
+	if ( _mqttConnected ) _mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
 }
 
 void System::onReceive(Header hdr, Cbor& data) {
 	Json json(20);
-
+	if (hdr.is(_mqtt, REPLY(CONNECT))) {
+		_mqttConnected = true;
+		return;
+	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
+		_mqttConnected = false;
+		return;
+	} else if (hdr.is(INIT)) {
+		init();
+		return;
+	};
 	switch (hdr._event) {
 	case INIT: {
 		init();

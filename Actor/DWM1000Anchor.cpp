@@ -141,6 +141,7 @@ DWM1000_Anchor::DWM1000_Anchor(ActorRef mqtt) :
 		Actor("DWM1000_Anchor") {
 	_count = 0;
 	_mqtt = mqtt;
+	_mqttConnected = false;
 }
 
 ActorRef DWM1000_Anchor::create(ActorRef mqtt) {
@@ -148,7 +149,6 @@ ActorRef DWM1000_Anchor::create(ActorRef mqtt) {
 }
 
 DWM1000_Anchor::~DWM1000_Anchor() {
-
 }
 //_________________________________________________ HARd RESEST DWM1000_Anchor via PIN
 //
@@ -246,7 +246,8 @@ void DWM1000_Anchor::init() {
 		dwt_geteui((uint8_t*) &eui);
 		LOGF( "EUID : %ld", eui);
 		delay(2000);
-		if ( eui == 0xF1F2F3F4F5F6F7F) break;
+		if (eui == 0xF1F2F3F4F5F6F7F)
+			break;
 	}
 
 //	dwt_softreset();
@@ -284,35 +285,54 @@ void DWM1000_Anchor::init() {
 	_count = 0;
 }
 
+bool DWM1000_Anchor::subscribed(Header hdr) {
+	return Actor::subscribed(hdr) || hdr.is(_mqtt, REPLY(CONNECT))
+			|| hdr.is(_mqtt, REPLY(DISCONNECT));
+}
+
 // extern "C" char* bytesToHex(uint8static ActorRef create(ActorRef mqtt) {
-static uint32_t polls=0;
+static uint32_t polls = 0;
 void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 	Json json(20);
 
+	if (hdr.is(_mqtt, REPLY(CONNECT))) {
+		_mqttConnected = true;
+		return;
+	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
+		_mqttConnected = false;
+		return;
+	} else if (hdr.is(INIT)) {
+		init();
+		return;
+	};
+
 	PT_BEGIN()
-	PT_WAIT_UNTIL(hdr.is(INIT));
-	init();
 	while (true) {
 
 		WAIT_POLL: {
 			dwt_setrxtimeout(0); /* Clear reception timeout to start next ranging process. */
 			dwt_rxenable(0); /* Activate reception immediately. */
-			dwt_setinterrupt(DWT_INT_RFCG, 1);	// enable RXD interrupt
+			dwt_setinterrupt(DWT_INT_RFCG, 1); // enable RXD interrupt
 
 			while (true) { /* Poll for reception of a frame or error/timeout. See NOTE 7 below. */
 				setReceiveTimeout(3000);/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 				clearInterrupt();
 				PT_YIELD_UNTIL(hdr.is(TIMEOUT) || isInterruptDetected());
 				status_reg = _status_reg;
-				LOGF( " status reg.:%X,interrupts : %X",
-						status_reg, interruptCount);
-				json.add(polls++);
-				Bytes* js=&json;
-				_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/polls",js));
+				if (_mqttConnected) {
 
-				json.clear();
-				json.add(interruptCount);
-				_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/interrupts",js));
+					LOGF( " status reg.:%X,interrupts : %X",
+							status_reg, interruptCount);
+					json.add(polls++);
+					Bytes* js = &json;
+					_mqtt.tell(self(), PUBLISH, 0,
+							_cborOut.putf("sB", "dwm1000/polls", js));
+
+					json.clear();
+					json.add(interruptCount);
+					_mqtt.tell(self(), PUBLISH, 0,
+							_cborOut.putf("sB", "dwm1000/interrupts", js));
+				}
 
 				status_reg = dwt_read32bitreg(SYS_STATUS_ID);
 				LOGF( " IRQ pin : %X status_reg DWM1000  %X",
@@ -326,7 +346,9 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 		///____________________________________________________________________________
 
 		if (status_reg & SYS_STATUS_RXFCG) {
-			_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("ss","dwm1000/status","data received"));
+			if (_mqttConnected)
+				_mqtt.tell(self(), PUBLISH, 0,
+						_cborOut.putf("ss", "dwm1000/status", "data received"));
 			uint32 frame_len;
 			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
 			/* Clear good RX frame event in the DW1000 status register. */
@@ -341,7 +363,9 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 			 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
 			rx_buffer[ALL_MSG_SN_IDX] = 0;
 			if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
-				_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("ss","dwm1000/status","data received for anchor"));
+				_mqtt.tell(self(), PUBLISH, 0,
+						_cborOut.putf("ss", "dwm1000/status",
+								"data received for anchor"));
 				uint32 resp_tx_time;
 
 				poll_rx_ts = get_rx_timestamp_u64(); /* Retrieve poll reception timestamp. */
@@ -381,7 +405,8 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 				frame_seq_nb++;
 
 				if (status_reg & SYS_STATUS_RXFCG) {
-					_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("ss","dwm1000/status","replied"));
+					_mqtt.tell(self(), PUBLISH, 0,
+							_cborOut.putf("ss", "dwm1000/status", "replied"));
 					/* Clear good RX frame event and TX frame sent in the DW1000 status register. */
 					dwt_write32bitreg(SYS_STATUS_ID,
 							SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
@@ -433,9 +458,10 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 //						char dist_str[20];
 //						sprintf(dist_str,"%3.2f", distance);
 						//                      lcd_display_str(dist_str);
-						json.add((float)distance);
-						_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/distance",&json));
-						LOGF( " distance : %d m",(float) distance);
+						json.add((float) distance);
+						_mqtt.tell(self(), PUBLISH, 0,
+								_cborOut.putf("sB", "dwm1000/distance", &json));
+						LOGF( " distance : %d m", (float) distance);
 					}
 				} else {
 					/* Clear RX error events in the DW1000 status register. */

@@ -120,6 +120,7 @@ DWM1000_Tag::DWM1000_Tag(ActorRef mqtt) :
 		Actor("DWM1000_Tag") {
 	_count = 0;
 	_mqtt = mqtt;
+	_mqttConnected = false;
 }
 
 ActorRef DWM1000_Tag::create(ActorRef mqtt) {
@@ -197,15 +198,18 @@ void DWM1000_Tag::initSpi() {
 			(( 0x1 & SPI_MISO_DELAY_MODE )<< SPI_MISO_DELAY_MODE_S ) |//
 			0);
 }
-
+//___________________________________________________
+//
 void tag_txcallback(const dwt_callback_data_t * data) {
 	interruptCount++;
 }
-
+//___________________________________________________
+//
 void tag_rxcallback(const dwt_callback_data_t * data) {
 	interruptCount++;
 }
-
+//___________________________________________________
+//
 void DWM1000_Tag::init() {
 	LOGF("HSPI");
 //_________________________________________________INIT SPI ESP8266
@@ -256,34 +260,87 @@ void DWM1000_Tag::init() {
 
 	_count = 0;
 }
+//___________________________________________________
+//
+bool DWM1000_Tag::subscribed(Header hdr) {
+	return Actor::subscribed(hdr) || hdr.is(_mqtt, REPLY(CONNECT))
+			|| hdr.is(_mqtt, REPLY(DISCONNECT));
+}
+
+static int _timeoutCounter = 0;
+//___________________________________________________
+//
+
+void DWM1000_Tag::sendPoll() {
+	/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
+	tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+	dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
+	dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
+
+	/* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
+	 * set by dwt_setrxaftertxdelay() has elapsed. */
+	dwt_setinterrupt(DWT_INT_TFRS, 0);
+	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
+	clearInterrupt();
+	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED); // SEND POLL MSG
+	_timeoutCounter = 0;
+
+	/* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 8 below. */
+
+}
+//___________________________________________________
+//
+void DWM1000_Tag::sendFinal() {
+	uint32 final_tx_time;
+
+	/* Retrieve poll transmission and response reception timestamp. */
+	poll_tx_ts = get_tx_timestamp_u64();
+	resp_rx_ts = get_rx_timestamp_u64();
+
+	/* Compute final message transmission time. See NOTE 9 below. */
+	final_tx_time = (resp_rx_ts
+			+ (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+	dwt_setdelayedtrxtime(final_tx_time);
+
+	/* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
+	final_tx_ts = (((uint64) (final_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
+
+	/* Write all timestamps in the final message. See NOTE 10 below. */
+	final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX], poll_tx_ts);
+	final_msg_set_ts(&tx_final_msg[FINAL_MSG_RESP_RX_TS_IDX], resp_rx_ts);
+	final_msg_set_ts(&tx_final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_ts);
+
+	/* Write and send final message. See NOTE 7 below. */
+	tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+	dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0);
+	dwt_writetxfctrl(sizeof(tx_final_msg), 0);
+	dwt_starttx(DWT_START_TX_DELAYED); // SEND FINAL MSG
+}
 
 //extern "C" char* bytesToHex(uint8_t* pb, uint32_t len);
-static int _timeoutCounter = 0;
+
 void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
+	if (hdr.is(_mqtt, REPLY(CONNECT))) {
+		LOGF("");
+		_mqttConnected = true;
+		return;
+	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
+		LOGF("");
+		_mqttConnected = false;
+		return;
+	} else if (hdr.is(INIT)) {
+		init();
+		return;
+	};
 	Json json(20);
-	static uint32_t polls=0;
+	static uint32_t polls = 0;
 	PT_BEGIN()
-	PT_WAIT_UNTIL(hdr.is(INIT));
-	init();
 
 	POLL_SEND: {
 		while (true) {
 			setReceiveTimeout(3000); // delay  between POLL
 			PT_YIELD_UNTIL(hdr.is(TIMEOUT));
-			/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
-			tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-			dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
-			dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
-
-			/* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
-			 * set by dwt_setrxaftertxdelay() has elapsed. */
-			dwt_setinterrupt(DWT_INT_TFRS, 0);
-			dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
-			clearInterrupt();
-			dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED); // SEND POLL MSG
-			_timeoutCounter = 0;
-
-			/* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 8 below. */
+			sendPoll();
 			setReceiveTimeout(10);
 			PT_YIELD_UNTIL(hdr.is(TIMEOUT) || isInterruptDetected());
 			// WAIT RESP MSG
@@ -299,7 +356,6 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 			} else if (status_reg & SYS_STATUS_RXFCG)
 				goto RESP_RECEIVED;
 			else if (status_reg & SYS_STATUS_ALL_RX_ERR) {
-
 				if (status_reg & SYS_STATUS_RXRFTO) {
 					LOGF(" RX Timeout");
 				} else {
@@ -311,13 +367,17 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 			}
 			LOGF( " status reg.:%X,interrupts : %X",
 					status_reg, interruptCount);
-			json.add(polls++);
-			Bytes* js=&json;
-			_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/polls",js));
+			if (_mqttConnected) {
+				json.add(polls++);
+				Bytes* js = &json;
+				_mqtt.tell(self(), PUBLISH, 0,
+						_cborOut.putf("sB", "dwm1000/polls", js));
 
-			json.clear();
-			json.add(interruptCount);
-			_mqtt.tell(self(),PUBLISH,0,_cborOut.putf("sB","dwm1000/interrupts",js));
+				json.clear();
+				json.add(interruptCount);
+				_mqtt.tell(self(), PUBLISH, 0,
+						_cborOut.putf("sB", "dwm1000/interrupts", js));
+			}
 
 		}
 
@@ -342,35 +402,7 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 		 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
 		rx_buffer[ALL_MSG_SN_IDX] = 0;
 		if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) { // CHECK RESP MSG
-			uint32 final_tx_time;
-
-			/* Retrieve poll transmission and response reception timestamp. */
-			poll_tx_ts = get_tx_timestamp_u64();
-			resp_rx_ts = get_rx_timestamp_u64();
-
-			/* Compute final message transmission time. See NOTE 9 below. */
-			final_tx_time = (resp_rx_ts
-					+ (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-			dwt_setdelayedtrxtime(final_tx_time);
-
-			/* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-			final_tx_ts = (((uint64) (final_tx_time & 0xFFFFFFFE)) << 8)
-					+ TX_ANT_DLY;
-
-			/* Write all timestamps in the final message. See NOTE 10 below. */
-			final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX],
-					poll_tx_ts);
-			final_msg_set_ts(&tx_final_msg[FINAL_MSG_RESP_RX_TS_IDX],
-					resp_rx_ts);
-			final_msg_set_ts(&tx_final_msg[FINAL_MSG_FINAL_TX_TS_IDX],
-					final_tx_ts);
-
-			/* Write and send final message. See NOTE 7 below. */
-			tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-			dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0);
-			dwt_writetxfctrl(sizeof(tx_final_msg), 0);
-			dwt_starttx(DWT_START_TX_DELAYED); // SEND FINAL MSG
-
+			sendFinal();
 			/* Poll DW1000 until TX frame sent event set. See NOTE 8 below. */
 			setReceiveTimeout(10);
 			PT_YIELD_UNTIL(

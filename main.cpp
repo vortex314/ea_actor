@@ -37,7 +37,7 @@ extern "C" void setup(void) {
 	config = Config::create();
 
 #ifdef TAG
-	mqtt = Mqtt::create("tag_1/");
+	mqtt = Mqtt::create(mqttFramer,"tag_1/");
 	dwm1000 = DWM1000_Tag::create(mqtt);
 #else
 	mqtt = Mqtt::create("anchor_1/");
@@ -49,7 +49,7 @@ extern "C" void setup(void) {
 
 
 
-	Actor::broadcast(Actor::dummy(), INIT, 0);
+	Actor::broadcast(ActorRef(0), INIT, 0);
 
 }
 

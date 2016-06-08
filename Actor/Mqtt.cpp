@@ -21,21 +21,22 @@ MqttMsg _mqttOut(MQTT_MSG_MAX_LENGTH);
 //
 //________________________________________________________________________________________________________
 //
-Mqtt::Mqtt(const char* prefix) :
+Mqtt::Mqtt(ActorRef framer,const char* prefix) :
 		Actor("Mqtt") {
 	_prefix = prefix;
-	_connector = MqttConnector::create(self(), prefix);
-	_publisher = MqttPublisher::create(self(), prefix);
-	_subscriber = MqttSubscriber::create(self(), prefix);
-	_pinger = MqttPinger::create(self());
+	_framer=framer;
+	_connector = MqttConnector::create(framer,self(), prefix);
+	_publisher = MqttPublisher::create(framer,self(), prefix);
+	_subscriber = MqttSubscriber::create(framer,self(), prefix);
+	_pinger = MqttPinger::create(framer,self());
 	_connected = false;
 }
 
 Mqtt::~Mqtt() {
 }
 
-ActorRef Mqtt::create(const char* prefix) {
-	return ActorRef(new Mqtt(prefix));
+ActorRef Mqtt::create(ActorRef framer,const char* prefix) {
+	return ActorRef(new Mqtt(framer,prefix));
 }
 
 void Mqtt::onReceive(Header hdr, Cbor& cbor) {
@@ -49,23 +50,27 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 		switch (hdr._detail) {
 		case MQTT_MSG_PINGREQ:
 		case MQTT_MSG_PINGRESP: {
-			_pinger.delegate(hdr, cbor);
+			hdr.src(self()).dst(_pinger);
+			_pinger.tell(hdr, cbor);
 			break;
 		}
 		case MQTT_MSG_PUBLISH:
 		case MQTT_MSG_PUBREL:
 		case MQTT_MSG_SUBACK:
 		case MQTT_MSG_UNSUBACK: {
+			hdr.src(self()).dst(_subscriber);
 			_subscriber.tell(hdr, cbor);
 			break;
 		}
 		case MQTT_MSG_PUBACK:
 		case MQTT_MSG_PUBCOMP: {
+			hdr.src(self()).dst(_publisher);
 			_publisher.tell(hdr, cbor);
 			break;
 		}
 		case MQTT_MSG_DISCONNECT:
 		case MQTT_MSG_CONNACK: {
+			hdr.src(self()).dst(_connector);
 			_connector.tell(hdr, cbor);
 			break;
 		}
@@ -74,21 +79,21 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 			break;
 		}
 		}
-	} else if (hdr.matches(self(), _connector, REPLY(CONNECT), 0)) { // CONNACK received
+	} else if (hdr.is(self(), _connector, REPLY(CONNECT), 0)) { // CONNACK received
 		_connected = true;
-		_pinger.tell(hdr, cbor);
+/*		_pinger.tell(hdr, cbor);
 		_publisher.tell(hdr, cbor);
 		_subscriber.tell(hdr, cbor);
-		right().tell(hdr, cbor);
-	} else if (hdr.matches(self(), left(), REPLY(CONNECT), 0)) { // TCP conected
+		right().tell(hdr, cbor);*/
+	} else if (hdr.is(self(), left(), REPLY(CONNECT), 0)) { // TCP connected
 		_connector.tell(hdr, cbor);
-	} else if (hdr.matches(self(), left(), REPLY(DISCONNECT), 0)) { // TCP disconnected
+	} else if (hdr.is(self(), left(), REPLY(DISCONNECT), 0)) { // TCP disconnected
 		_connected = false;
-		_connector.tell(hdr, cbor);
+/*		_connector.tell(hdr, cbor);
 		_pinger.tell(hdr, cbor);
 		_publisher.tell(hdr, cbor);
 		_subscriber.tell(hdr, cbor);
-		right().tell(hdr, cbor);
+		right().tell(hdr, cbor);*/
 	} else if (hdr.is(DISCONNECT)) { // pinger asks to disconnect after ping failures
 		left().tell(self(), DISCONNECT, 0);
 	} else if (hdr.is(TXD, ANY)) { // child wants to transmit, send to framer
@@ -101,10 +106,12 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 //
 //________________________________________________________________________________________________________
 //
-MqttConnector::MqttConnector(ActorRef mqtt, const char* prefix) :
+MqttConnector::MqttConnector(ActorRef framer,ActorRef mqtt, const char* prefix) :
 		Actor("MqttConnector"), _clientId("nocl"), _prefix(20) {
 	_mqtt = mqtt;
 	_prefix = prefix;
+	_framer=framer;
+
 }
 
 void MqttConnector::init() {
@@ -113,8 +120,8 @@ void MqttConnector::init() {
 	sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
 }
 
-ActorRef MqttConnector::create(ActorRef mqtt, const char* prefix) {
-	return ActorRef(new MqttConnector(mqtt, prefix));
+ActorRef MqttConnector::create(ActorRef framer,ActorRef mqtt, const char* prefix) {
+	return ActorRef(new MqttConnector( framer,mqtt, prefix));
 }
 
 void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
@@ -124,7 +131,7 @@ void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
 	PT_BEGIN()
 	PT_WAIT_UNTIL(hdr.is(INIT, E_OK));
 	DISCONNECTED:
-	PT_WAIT_UNTIL(hdr.is(REPLY(CONNECT)));
+	PT_WAIT_UNTIL(hdr.is(_framer,REPLY(CONNECT)));
 	CONNECTED: {
 		while (true) {
 			setReceiveTimeout(MQTT_TIME_RECONNECT);
@@ -132,14 +139,14 @@ void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
 			_mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
 					lwtTopic.c_str(), onlineFalse, "", "",
 					TIME_KEEP_ALIVE / 1000);
-			_mqtt.tell(Header(_mqtt, self(), TXD, 0),
+			_framer.tell(Header(_mqtt, self(), TXD, 0),
 					_cborOut.putf("B", &_mqttOut));
 			PT_WAIT_UNTIL(
-					hdr.is(REPLY(DISCONNECT)) ||hdr.is(RXD, MQTT_MSG_CONNACK));
+					hdr.is(_framer,REPLY(DISCONNECT)) ||hdr.is(RXD, MQTT_MSG_CONNACK));
 			if (hdr.is(REPLY(DISCONNECT)))
 				goto DISCONNECTED;
 			if (hdr.is(RXD, MQTT_MSG_CONNACK)) {
-				_mqtt.tell(self(), REPLY(CONNECT), E_OK);
+				broadcast(_mqtt,REPLY(CONNECT),0);
 				goto MQTT_CONNECTED;
 			}
 		}
@@ -155,13 +162,15 @@ PT_END()
 //
 //________________________________________________________________________________________________________
 //
-MqttPinger::MqttPinger(ActorRef mqtt) :
+MqttPinger::MqttPinger(ActorRef framer,ActorRef mqtt) :
 	Actor("MqttPinger"), _retries(0) {
 _mqtt = mqtt;
+_framer=framer;
+
 }
 
-ActorRef MqttPinger::create(ActorRef mqtt) {
-return ActorRef(new MqttPinger(mqtt));
+ActorRef MqttPinger::create(ActorRef framer,ActorRef mqtt) {
+return ActorRef(new MqttPinger( framer,mqtt));
 }
 
 void MqttPinger::onReceive(Header hdr, Cbor& cbor) {
@@ -173,8 +182,8 @@ PT_WAIT_UNTIL(hdr.is(REPLY(CONNECT)));
 goto PINGING;
 WAITING: { // wait between PING's
 	setReceiveTimeout((TIME_KEEP_ALIVE / 3));
-	PT_WAIT_UNTIL(hdr.is(REPLY(DISCONNECT)) || hdr.is(TIMEOUT));
-	if (hdr.is(REPLY(DISCONNECT)))
+	PT_WAIT_UNTIL(hdr.is(_mqtt,REPLY(DISCONNECT)) || hdr.is(TIMEOUT));
+	if (hdr.is(_mqtt,REPLY(DISCONNECT)))
 		goto DISCONNECTED;
 }
 PINGING: {	// retyr 3 ping's max
@@ -182,7 +191,7 @@ PINGING: {	// retyr 3 ping's max
 	while (_retries < 3) {
 
 		_mqttOut.PingReq();
-		_mqtt.tell(self(), TXD, 0, _cborOut.putf("B", (Bytes*) &_mqttOut));
+		_framer.tell(self(), TXD, 0, _cborOut.putf("B", (Bytes*) &_mqttOut));
 		setReceiveTimeout(TIME_PING);
 
 		PT_YIELD_UNTIL(
@@ -195,8 +204,8 @@ PINGING: {	// retyr 3 ping's max
 		} else if (hdr.is(DISCONNECT))
 			goto DISCONNECTED;
 	}
-	_mqtt.tell(self(), DISCONNECT, 0);
-	LOGF(" ping timeouts retries reached ");
+	_framer.tell(self(), DISCONNECT, 0);
+	LOGF(" ping timeouts retries reached, disconnecting ... ");
 	goto DISCONNECTED;
 }
 
@@ -206,7 +215,7 @@ PT_END()
 //
 //________________________________________________________________________________________________________
 //
-MqttPublisher::MqttPublisher(ActorRef mqtt, const char* prefix) :
+MqttPublisher::MqttPublisher(ActorRef framer,ActorRef mqtt, const char* prefix) :
 Actor("MqttPublisher"), _prefix(20), _topic(MQTT_TOPIC_MAX_LENGTH), _message(
 		MQTT_VALUE_MAX_LENGTH) {
 _mqtt = mqtt;
@@ -215,10 +224,12 @@ _messageId = 0;
 _retries = 0;
 _qos = 0;
 _prefix = prefix;
+_framer=framer;
+
 }
 
-ActorRef MqttPublisher::create(ActorRef mqtt, const char* prefix) {
-return ActorRef(new MqttPublisher(mqtt, prefix));
+ActorRef MqttPublisher::create(ActorRef framer,ActorRef mqtt, const char* prefix) {
+return ActorRef(new MqttPublisher(framer,mqtt, prefix));
 }
 
 void MqttPublisher::sendPublish() {
@@ -241,12 +252,12 @@ Str _fullTopic(60);
 _fullTopic = _prefix;
 _fullTopic.append(_topic);
 _mqttOut.Publish(header, _fullTopic, _message, _messageId);
-_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B", &_mqttOut));
+_framer.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B", &_mqttOut));
 }
 
 void MqttPublisher::sendPubRel() {
 _mqttOut.PubRel(_messageId);
-_mqtt.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B", &_mqttOut));
+_framer.tell(Header(_mqtt, self(), TXD, 0), _cborOut.putf("B", &_mqttOut));
 }
 
 void MqttPublisher::onReceive(Header hdr, Cbor& cbor) {
@@ -328,7 +339,7 @@ for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
 		int mqttType, id;
 		cbor.get(mqttType);
 		if (cbor.get(id) && id == _messageId) {
-//			Msg::publish(this, SIG_ERC, 0);
+//			Msg::publish(this, SIG_ERC, 0);ActorRef
 			goto READY;
 		} else { // wrong pubcomp, don't resend PUBREL
 			goto WAIT_REPLY1;
@@ -342,7 +353,7 @@ PT_END()
 }
 //________________________________________________________________________________________________________
 //
-MqttSubscriber::MqttSubscriber(ActorRef mqtt, const char* prefix) :
+MqttSubscriber::MqttSubscriber(ActorRef framer,ActorRef mqtt, const char* prefix) :
 Actor("MqttSubscriber"), _prefix(20), _topic(MQTT_TOPIC_MAX_LENGTH), _message(
 	MQTT_VALUE_MAX_LENGTH) {
 _qos = 0;
@@ -351,10 +362,12 @@ _retries = 0;
 _mqtt = mqtt;
 _qos = 0;
 _prefix = prefix;
+_framer=framer;
+
 }
 
-ActorRef MqttSubscriber::create(ActorRef mqtt, const char* prefix) {
-return ActorRef(new MqttSubscriber(mqtt, prefix));
+ActorRef MqttSubscriber::create(ActorRef framer,ActorRef mqtt, const char* prefix) {
+return ActorRef(new MqttSubscriber(framer,mqtt, prefix));
 }
 
 void MqttSubscriber::onReceive(Header hdr, Cbor& cbor) {

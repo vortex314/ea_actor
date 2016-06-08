@@ -35,7 +35,7 @@ class Mqtt: public Actor {
 	ActorRef _publisher;
 	ActorRef _subscriber;
 	Str _prefix;
-	Mqtt(const char *prefix);
+	Mqtt(ActorRef framer,const char *prefix);
 	static MqttMsg _mqttIn;
 	static MqttMsg _mqttOut;
 	bool _connected;
@@ -43,7 +43,7 @@ public:
 
 	virtual ~Mqtt();
 	void onReceive(Header, Cbor&);
-	static ActorRef create(const char* prefix);
+	static ActorRef create(ActorRef framer,const char* prefix);
 };
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
@@ -51,10 +51,11 @@ public:
  */
 class MqttPinger: public Actor {
 	ActorRef _mqtt;
-	MqttPinger(ActorRef mqtt);
+	ActorRef _framer;
+	MqttPinger(ActorRef framer,ActorRef mqtt);
 	uint8_t _retries;
 public:
-	static ActorRef create(ActorRef mqtt);
+	static ActorRef create(ActorRef framer,ActorRef mqtt);
 	void onReceive(Header, Cbor&);
 };
 /*
@@ -65,9 +66,10 @@ class MqttConnector: public Actor {
 	const char* _clientId;
 	Str _prefix;
 	ActorRef _mqtt;
-	MqttConnector(ActorRef mqtt,const char* prefix);
+	ActorRef _framer;
+	MqttConnector(ActorRef framer,ActorRef mqtt,const char* prefix);
 public:
-	static ActorRef create(ActorRef mqtt,const char* prefix);
+	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 	void init();
 };
@@ -77,8 +79,9 @@ public:
  */
 class MqttPublisher: public Actor {
 	ActorRef _mqtt;
+	ActorRef _framer;
 	Str _prefix;
-	MqttPublisher(ActorRef mqtt,const char* prefix);
+	MqttPublisher(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void sendPublish();
 	void sendPubRel();
 	uint8_t _qos;
@@ -88,7 +91,7 @@ class MqttPublisher: public Actor {
 //	uint32_t _flags;
 	uint16_t _retries;
 public:
-	static ActorRef create(ActorRef mqtt,const char* prefix);
+	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 };
 /*
@@ -97,9 +100,9 @@ public:
  */
 class MqttSubscriber: public Actor {
 	ActorRef _mqtt;
-	ActorRef _sender;
+	ActorRef _framer;
 
-	MqttSubscriber(ActorRef mqtt,const char* prefix);
+	MqttSubscriber(ActorRef framer,ActorRef mqtt,const char* prefix);
 	Str _prefix;
 	Str _topic;
 	Bytes _message;
@@ -112,7 +115,7 @@ class MqttSubscriber: public Actor {
 	void sendPubAck();
 	void sendSubscribe();
 public:
-	static ActorRef create(ActorRef mqtt,const char* prefix);
+	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 };
 
