@@ -44,6 +44,7 @@ public:
 	virtual ~Mqtt();
 	void onReceive(Header, Cbor&);
 	static ActorRef create(ActorRef framer,const char* prefix);
+	bool subscribed(Header hdr);
 };
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_PONG),REPLY(TXD),REPLY(CONNECT)
@@ -57,6 +58,7 @@ class MqttPinger: public Actor {
 public:
 	static ActorRef create(ActorRef framer,ActorRef mqtt);
 	void onReceive(Header, Cbor&);
+	bool subscribed(Header hdr);
 };
 /*
  * IN : INIT, CONFIG("host",port,...), RXD(MQTT_CONNACK),REPLY(TXD),REPLY(CONNECT)
@@ -72,6 +74,7 @@ public:
 	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
 	void init();
+	bool subscribed(Header hdr);
 };
 /*
  * IN : INIT, CONFIG("prefix"), RXD(MQTT_PUBACK,MQTT_PUBREC),REPLY(TXD)
@@ -93,6 +96,7 @@ class MqttPublisher: public Actor {
 public:
 	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
+	bool subscribed(Header hdr);
 };
 /*
  * IN : INIT, CONFIG("prefix"), RXD(MQTT_PUBLISH,MQTT_PUBREL),REPLY(TXD)
@@ -117,6 +121,7 @@ class MqttSubscriber: public Actor {
 public:
 	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);
+	bool subscribed(Header hdr);
 };
 
 

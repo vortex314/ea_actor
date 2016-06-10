@@ -54,6 +54,10 @@ public:
 	bool is(ActorRef src, uint8_t event);
 	Header& src(ActorRef);
 	Header& dst(ActorRef);
+	ActorRef src();
+	ActorRef dst();
+	Event event();
+
 };
 
 //#define LOGF(fmt,...) PrintHeader(__FILE__,__LINE__,__FUNCTION__);Serial.printf(fmt,##__VA_ARGS__);Serial.println();
@@ -124,6 +128,7 @@ public:
 		return ActorRef(0);
 	}
 	static ActorRef byPath(const char* path);
+	bool operator==(ActorRef ref);
 };
 
 class Actor {

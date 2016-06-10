@@ -330,7 +330,6 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 		return;
 	} else if (hdr.is(INIT)) {
 		init();
-		return;
 	};
 	Json json(20);
 	static uint32_t polls = 0;

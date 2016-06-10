@@ -47,15 +47,11 @@ void System::onReceive(Header hdr, Cbor& data) {
 		_mqttConnected = false;
 		return;
 	} else if (hdr.is(INIT)) {
+		setReceiveTimeout(10000);
 		init();
 		return;
 	};
 	switch (hdr._event) {
-	case INIT: {
-		init();
-		setReceiveTimeout(10000);
-		break;
-	}
 	case TIMEOUT: {
 		setReceiveTimeout(1000);
 		json.clear();
@@ -67,9 +63,6 @@ void System::onReceive(Header hdr, Cbor& data) {
 		json.clear();
 		json.add((uint64_t) system_get_free_heap_size());
 		publish(0, "system/heap_size", json);
-		break;
-	}
-	case REPLY(CONNECT): {
 		break;
 	}
 	default: {

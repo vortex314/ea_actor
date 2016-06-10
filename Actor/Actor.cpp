@@ -78,9 +78,17 @@ Header& Header::src(ActorRef src) {
 	return *this;
 }
 
+ActorRef Header::src(){
+	return ActorRef(_src);
+}
+
 Header& Header::dst(ActorRef dst) {
 	_dst = dst.idx();
 	return *this;
+}
+
+ActorRef Header::dst(){
+	return ActorRef(_dst);
 }
 
 bool Header::is(int dst, int src, Event event, uint8_t detail) {
@@ -323,6 +331,10 @@ ActorRef::~ActorRef() {
 
 bool ActorRef::equal(ActorRef ref) {
 	return _idx == ref._idx;
+}
+
+bool ActorRef::operator==(ActorRef ref){
+	return ref._idx == _idx;
 }
 
 void ActorRef::tell(Header header, Cbor& data) {

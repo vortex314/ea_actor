@@ -288,6 +288,9 @@ void Tcp::disconnectCb(void* arg) {
 	return;
 }
 
+//___________________________________________________ send
+//
+
 void Tcp::send() { // send buffered data, max 100 bytes
 
 	if (_sendState == READY) {
@@ -313,6 +316,9 @@ void Tcp::send() { // send buffered data, max 100 bytes
 	}
 }
 
+//___________________________________________________ writeFinishCb
+//
+
 void Tcp::writeFinishCb(void* arg) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
@@ -320,6 +326,9 @@ void Tcp::writeFinishCb(void* arg) {
 
 	return;
 }
+
+//___________________________________________________ sendCb
+//
 
 void Tcp::sendCb(void *arg) {
 	struct espconn* pconn = (struct espconn*) arg;
@@ -330,6 +339,9 @@ void Tcp::sendCb(void *arg) {
 	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	return;
 }
+
+//___________________________________________________ recvCb
+//
 
 void Tcp::recvCb(void* arg, char *pdata, unsigned short len) {
 
@@ -357,6 +369,9 @@ void Tcp::recvCb(void* arg, char *pdata, unsigned short len) {
 		LOGF(" Tcp not found ");
 	}
 }
+
+//___________________________________________________ dnsFoundCb
+//
 
 void Tcp::dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg) {
 //	Tcp *pTcp = getInstance(pconn);
