@@ -93,6 +93,7 @@ class MqttPublisher: public Actor {
 	uint16_t _messageId;
 //	uint32_t _flags;
 	uint16_t _retries;
+	bool _connected;
 public:
 	static ActorRef create(ActorRef framer,ActorRef mqtt,const char* prefix);
 	void onReceive(Header, Cbor&);

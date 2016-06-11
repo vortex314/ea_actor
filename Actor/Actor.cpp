@@ -275,12 +275,12 @@ void Actor::eventLoop() {
 			if (Actor::_actors[i]->subscribed(hdr)) {
 				_cborIn.offset(0);
 				_cborOut.clear();
-				LOGF("event %s => {%s,%d,%d} => %s ",
+/*				LOGF("event %s => {%s,%d,%d} => %s ",
 						Actor::idxToPath(hdr._src), //
 						Actor::eventToString(hdr._event),//
 						hdr._detail,//
 						_cborIn.length(),//
-						Actor::_actors[i]->path())
+						Actor::_actors[i]->path());*/
 				Actor::byIndex(i).onReceive(hdr, _cborIn);
 			}
 		}

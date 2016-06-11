@@ -49,10 +49,12 @@ bool Mqtt::subscribed(Header hdr) {
 void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 
 	if (hdr.is(SUBSCRIBE)) {
-		_subscriber.tell(hdr, cbor);
+		_subscriber.delegate(hdr, cbor);
 	} else if (hdr.is(PUBLISH)) {
 		if (_connected)
-			_publisher.tell(hdr, cbor);
+			_publisher.delegate(hdr, cbor);
+		else
+			LOGF("disconnected");
 	} else if (hdr.is(RXD, ANY)) {
 		switch (hdr._detail) {
 		case MQTT_MSG_PINGREQ:
@@ -82,7 +84,7 @@ void Mqtt::onReceive(Header hdr, Cbor& cbor) {
 			break;
 		}
 		}
-	} else if (hdr.is(self(), _connector, REPLY(CONNECT), 0)) { // CONNACK received
+	} else if (hdr.is(self(), REPLY(CONNECT))) { // CONNACK received, broadcast
 		_connected = true;
 	} else if (hdr.is(_framer, REPLY(CONNECT))) { // TCP connected
 		_connector.delegate(hdr, cbor);
@@ -128,28 +130,32 @@ void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
 	Str lwtTopic(60);
 	lwtTopic.append(_prefix).append("system/online");
 	PT_BEGIN()
-	PT_WAIT_UNTIL(hdr.is(INIT, E_OK));
+		PT_WAIT_UNTIL(hdr.is(INIT, E_OK));
 	DISCONNECTED: {
 		PT_WAIT_UNTIL(hdr.is(_framer,REPLY(CONNECT)));
-	}
+		}
 	TCP_CONNECTED: {
-		setReceiveTimeout(MQTT_TIME_RECONNECT);
+		while(true) {
+			setReceiveTimeout(MQTT_TIME_RECONNECT);
 
-		_mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
-				lwtTopic.c_str(), onlineFalse, "", "",
-				TIME_KEEP_ALIVE / 1000);
-		_framer.tell(Header(_mqtt, self(), TXD, 0),
+			_mqttOut.Connect(MQTT_QOS2_FLAG, _clientId, MQTT_CLEAN_SESSION,
+					lwtTopic.c_str(), onlineFalse, "", "",
+					TIME_KEEP_ALIVE / 1000);
+			_framer.tell(Header(_mqtt, self(), TXD, 0),
 					_cborOut.putf("B", &_mqttOut));
-		PT_WAIT_UNTIL(hdr.is(_framer,REPLY(DISCONNECT)) ||hdr.is(RXD, MQTT_MSG_CONNACK) || hdr.is(TIMEOUT));
-
+			PT_YIELD();
 			if (hdr.is(RXD, MQTT_MSG_CONNACK)) {
 				broadcast(_mqtt,REPLY(CONNECT),0);
 				goto MQTT_CONNECTED;
 			} else if (hdr.is(REPLY(DISCONNECT))) {
 				broadcast(_mqtt,REPLY(DISCONNECT),0);
 				goto DISCONNECTED;
-			} else _framer.tell(_mqtt,DISCONNECT,0);
-	}
+			} else if ( hdr.is(TIMEOUT)){
+				_framer.tell(_mqtt,DISCONNECT,0);
+				broadcast(_mqtt,REPLY(DISCONNECT),0);
+				}
+			}
+		}
 	MQTT_CONNECTED: {
 		setReceiveTimeout(UINT32_MAX);
 		PT_WAIT_UNTIL(hdr.is(_framer,REPLY(DISCONNECT)));
@@ -209,6 +215,7 @@ PINGING: {	// retyr 3 ping's max
 			goto DISCONNECTED;
 	}
 	_framer.tell(self(), DISCONNECT, 0);
+	broadcast(_mqtt,REPLY(DISCONNECT),0);
 	LOGF(" ping timeouts retries reached, disconnecting ... ");
 	goto DISCONNECTED;
 }
@@ -237,32 +244,39 @@ return ActorRef(new MqttPublisher(framer,mqtt, prefix));
 }
 
 void MqttPublisher::sendPublish() {
-uint8_t header = 0;
-if ((_qos & MQTT_QOS_MASK) == MQTT_QOS0_FLAG) {
-//		_state = ST_READY;
-} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS1_FLAG) {
-header += MQTT_QOS1_FLAG;
-setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS2_FLAG) {
-header += MQTT_QOS2_FLAG;
-setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-}
-if (_qos & MQTT_RETAIN_FLAG)
-header += MQTT_RETAIN_FLAG;
-if (_retries) {
-header += MQTT_DUP_FLAG;
-}
-Str _fullTopic(60);
-_fullTopic = _prefix;
-_fullTopic.append(_topic);
-_mqttOut.Publish(header, _fullTopic, _message, _messageId);
-_framer.tell(Header(_framer, _mqtt, TXD, 0), _cborOut.putf("B", &_mqttOut));
-LOGF(" TOPIC %s ",_fullTopic.c_str());
+	uint8_t header = 0;
+	 if (_qos  == MQTT_QOS1_FLAG) {
+
+		header += MQTT_QOS1_FLAG;
+		setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
+
+	} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS2_FLAG) {
+
+		header += MQTT_QOS2_FLAG;
+		setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
+	}
+
+	if (_qos & MQTT_RETAIN_FLAG)
+
+		header += MQTT_RETAIN_FLAG;
+
+	if (_retries) {
+
+		header += MQTT_DUP_FLAG;
+	}
+
+	Str _fullTopic(60);
+	_fullTopic = _prefix;
+	_fullTopic.append(_topic);
+
+	_mqttOut.Publish(header, _fullTopic, _message, _messageId);
+	_framer.tell(Header(_framer, _mqtt, TXD, 0), _cborOut.putf("B", &_mqttOut));
+	LOGF(" TOPIC %s ",_fullTopic.c_str());
 }
 
 void MqttPublisher::sendPubRel() {
-_mqttOut.PubRel(_messageId);
-_framer.tell(Header(_framer, _mqtt, TXD, 0), _cborOut.putf("B", &_mqttOut));
+	_mqttOut.PubRel(_messageId);
+	_framer.tell(Header(_framer, _mqtt, TXD, 0), _cborOut.putf("B", &_mqttOut));
 }
 
 bool MqttPublisher::subscribed(Header hdr) {
@@ -271,94 +285,87 @@ bool MqttPublisher::subscribed(Header hdr) {
 
 
 void MqttPublisher::onReceive(Header hdr, Cbor& cbor) {
-PT_BEGIN()
-PT_WAIT_UNTIL(hdr.is(INIT));
-DISCONNECTED:
-PT_WAIT_UNTIL(hdr.is(_mqtt,REPLY(CONNECT)));
-READY: {
-PT_YIELD_UNTIL(hdr.is(PUBLISH));
-_messageId++;
-_qos = hdr._detail;
-ASSERT_LOG(cbor.scanf("SB",&_topic,&_message));
-if ((_qos & MQTT_QOS_MASK) == MQTT_QOS0_FLAG) {
-	sendPublish();
-//	PT_YIELD_UNTIL(msg.is(_mqtt._framer, SIG_TXD));
-//	Msg::publish(this, SIG_ERC, 0);
-	goto READY;
-} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS1_FLAG) {
-	goto QOS1_ACK;
-} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS2_FLAG) {
-	goto QOS2_REC;
-}
-goto READY;
-}
 
-QOS1_ACK: {
-// INFO("QOS1_ACK");
-for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
-	sendPublish();
-	WAIT_REPLY2: setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-	PT_YIELD_UNTIL(hdr.is(RXD, MQTT_MSG_PUBACK) || hdr.is(TIMEOUT));
-	if (hdr.is(RXD, MQTT_MSG_PUBACK)) {
-		int mqttType, id;
-		cbor.get(mqttType); // skip type in  <src><signal><type><msgId><qos><topic><value>
-		cbor.get(id);
-//		INFO(" messageId compare %d : %d ", id, _messageId);
-		if (id == _messageId) {
-//			Msg::publish(this, SIG_ERC, 0);
-			goto READY;
-		} else {
-			goto WAIT_REPLY2;
-		}
-	}
-}
-//Msg::publish(this, SIG_ERC, ETIMEDOUT);
-goto READY;
-}
+	PT_BEGIN()
 
-QOS2_REC: {
-// INFO("QOS2_REC");
-for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
-	sendPublish();
-	WAIT_REPLY: setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-	PT_YIELD_UNTIL(hdr.is(RXD, MQTT_MSG_PUBREC) || hdr.is(TIMEOUT));
-	if (hdr.is(RXD, MQTT_MSG_PUBREC)) {
-		int mqttType, id;
-		cbor.get(mqttType);
-//				INFO(" messageId compare %d : %d ",id,_messageId);
-		cbor.get(id);
-//		INFO(" messageId compare %d : %d ", id, _messageId);
-		if (id == _messageId) {
-			goto QOS2_COMP;
-		} else { // wrong PUBREC, don't resend
-			goto WAIT_REPLY;
-		}
-	}
-}
-//Msg::publish(this, SIG_ERC, ETIMEDOUT);
-goto READY;
-}
+	PT_WAIT_UNTIL(hdr.is(INIT));
 
-QOS2_COMP: {
-// INFO("QOS2_COMP");
-for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
-	sendPubRel();
-	WAIT_REPLY1: setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
-	PT_YIELD_UNTIL(hdr.is(RXD, MQTT_MSG_PUBCOMP) || hdr.is(TIMEOUT));
-	if (hdr.is(RXD, MQTT_MSG_PUBCOMP)) {
-		int mqttType, id;
-		cbor.get(mqttType);
-		if (cbor.get(id) && id == _messageId) {
-//			Msg::publish(this, SIG_ERC, 0);ActorRef
-			goto READY;
-		} else { // wrong pubcomp, don't resend PUBREL
-			goto WAIT_REPLY1;
+	DISCONNECTED:
+		LOGF("DISCONNECTED");
+		PT_WAIT_UNTIL(hdr.is(_mqtt,REPLY(CONNECT)));
+	READY: {
+		LOGF("READY");
+		PT_YIELD();
+		if ( hdr.is(REPLY(DISCONNECT))) {
+			goto DISCONNECTED;
+		} else if ( hdr.is(PUBLISH)) {
+			_messageId++;
+			_qos = hdr._detail;
+			ASSERT_LOG(cbor.scanf("SB",&_topic,&_message));
+
+			if ((_qos & MQTT_QOS_MASK)   == MQTT_QOS0_FLAG) {
+				sendPublish();
+			} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS1_FLAG) {
+				goto QOS1_ACK;
+			} else if ((_qos & MQTT_QOS_MASK) == MQTT_QOS2_FLAG) {	// INFO("QOS2_COMP");
+				goto QOS2_REC;
+			}
 		}
+		goto READY;
 	}
-}
-//Msg::publish(this, SIG_ERC, ETIMEDOUT);
-goto READY;
-}
+
+	QOS1_ACK: {
+		LOGF("QOS1_ACK");
+		for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
+			sendPublish();
+			setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
+			PT_YIELD();
+			if (hdr.is(RXD, MQTT_MSG_PUBACK)) {
+					ASSERT_LOG(cbor.scanf("B",&_mqttIn));
+					if (_mqttIn.parse() &&  (_mqttIn.messageId() == _messageId)) {
+						goto READY;
+					}
+				}
+			}
+		goto READY;
+		}
+
+
+	QOS2_REC: {
+		LOGF("QOS2_REC");
+		for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
+			sendPublish();
+			setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
+			PT_YIELD();
+			if (hdr.is(RXD, MQTT_MSG_PUBREC)) {
+				ASSERT_LOG(cbor.scanf("B",&_mqttIn));
+				if (_mqttIn.parse() &&  (_mqttIn.messageId() == _messageId)) {
+					goto READY;
+					}
+				} else if ( hdr.is(REPLY(DISCONNECT))) {
+					goto DISCONNECTED;
+				}
+			}
+		goto READY;
+		}
+
+	QOS2_COMP:  {
+		LOGF("QOS2_REC");
+		for (_retries = 0; _retries < MQTT_PUB_MAX_RETRIES; _retries++) {
+			sendPubRel();
+			setReceiveTimeout(MQTT_TIME_WAIT_REPLY);
+			PT_YIELD();
+			if (hdr.is(RXD, MQTT_MSG_PUBCOMP)) {
+				ASSERT_LOG(cbor.scanf("B",&_mqttIn));
+				if (_mqttIn.parse() &&  (_mqttIn.messageId() == _messageId)) {
+					goto READY;
+					}
+				} else if ( hdr.is(REPLY(DISCONNECT))) {
+					goto DISCONNECTED;
+				}
+			}
+		goto READY;
+		}
 PT_END()
 }
 //________________________________________________________________________________________________________
