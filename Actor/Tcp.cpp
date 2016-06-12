@@ -62,25 +62,9 @@ void Tcp::unreg() {
 				cursor->_next = _next;
 	}
 }
-/*
- uint32_t Tcp::used() {
- uint32_t count = 0;
- Tcp* cursor;
- for (cursor = _first; cursor != 0; cursor = cursor->_next) {
- if (cursor->isConnected())
- count++;
- }
- return count;
- }
-
- uint32_t Tcp::count() {
- uint32_t count = 0;
- Tcp* cursor;
- for (cursor = _first; cursor != 0; cursor = cursor->_next)
- count++;
- return count;
- }*/
-
+//
+//================================================================
+//
 bool Tcp::match(struct espconn* pconn, Tcp* pTcp) {
 	/*	LOGF(" compare %X:%d : %X:%d ", *((uint32_t* )pTcp->_remote_ip.b),
 	 pTcp->_remote_port, *((uint32_t* )pconn->proto.tcp->remote_ip),
@@ -307,6 +291,7 @@ void Tcp::send() { // send buffered data, max 100 bytes
 		if (erc) {
 			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",
 					_conn, erc, _buffer.length());
+			disconnect();
 			return;
 		} else {
 			_sendState = SENDING;
