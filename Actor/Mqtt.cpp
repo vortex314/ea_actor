@@ -294,7 +294,7 @@ void MqttPublisher::onReceive(Header hdr, Cbor& cbor) {
 		LOGF("DISCONNECTED");
 		PT_WAIT_UNTIL(hdr.is(_mqtt,REPLY(CONNECT)));
 	READY: {
-		LOGF("READY");
+//		LOGF("READY");
 		PT_YIELD();
 		if ( hdr.is(REPLY(DISCONNECT))) {
 			goto DISCONNECTED;

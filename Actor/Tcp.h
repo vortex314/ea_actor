@@ -58,8 +58,8 @@ protected:
 	struct espconn* _conn;
 	char _host[64];
 	enum {
-		READY, SENDING
-	} _sendState ;//
+		DISCONNECTED, READY, SENDING
+	} _state ;//
 	bool _connected;
 
 private:

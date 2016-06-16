@@ -8,6 +8,8 @@
 #include "Tcp.h"
 #include <string.h>
 //#include <Logger.h>
+uint32_t sends=0;
+uint32_t sends_cb=0;
 
 //uint32_t Tcp::_maxConnections = 5;
 Tcp* Tcp::_first = 0;
@@ -29,7 +31,7 @@ Tcp::Tcp() :
 	_local_port = 0;
 	_lastRxd = Sys::millis();
 	reg();
-	_sendState = READY;
+	_state = DISCONNECTED;
 }
 
 Tcp::~Tcp() {
@@ -74,8 +76,10 @@ bool Tcp::match(struct espconn* pconn, Tcp* pTcp) {
 		if (pTcp->_remote_port == pconn->proto.tcp->remote_port)
 			if (memcmp(pTcp->_remote_ip.b, pconn->proto.tcp->remote_ip, 4) == 0)
 				return true;
-	if (pTcp->getType() == CLIENT && pTcp->_conn == pconn)
+	if (pTcp->getType() == CLIENT && pTcp->_conn == pconn) {
+		LOGF("dangerous assumption");
 		return true;
+	}
 
 	return false;
 }
@@ -163,12 +167,17 @@ Erc Tcp::write(uint8_t* pb, uint32_t length) {
 //	LOGF(" sending : %d bytes", length);
 	logConn(__FUNCTION__, _conn);
 	uint32_t i = 0;
+	if ( _txd.space() < length ) {
+		LOGF(" sends : %d sends_cb : %d ",sends,sends_cb);
+		return EAGAIN;
+	}
 	while (_txd.hasSpace() && (i < length)) {
 		_txd.write(pb[i++]);
 	};
 	if (i < length) {
 		_overflowTxd++;
 		LOGF("TCP BUFFER OVERFLOW");
+		LOGF(" sends : %d sends_cb : %d ",sends,sends_cb);
 	}
 	send();
 	return E_OK;
@@ -210,7 +219,7 @@ void Tcp::connectCb(void* arg) {
 		pTcp->loadEspconn(pconn);
 		pTcp->logConn(__FUNCTION__, arg);
 		pTcp->registerCb(pconn);
-		pTcp->_sendState = READY;
+		pTcp->_state = READY;
 
 		/*		uint32_t keeplive;
 
@@ -233,6 +242,7 @@ void Tcp::connectCb(void* arg) {
 		pTcp->_txd.clear();
 		pTcp->_connected = true;
 		pTcp->_lastRxd = Sys::millis();
+		pTcp->_state=READY;
 	} else {
 		LOGF(" no free TCP : disconnecting %X ", pconn);
 		LOGF("  tcp :  %x  , ip : %d.%d.%d.%d:%d  ",
@@ -245,16 +255,19 @@ void Tcp::connectCb(void* arg) {
 void Tcp::reconnectCb(void* arg, int8_t err) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
-	pTcp->logConn(__FUNCTION__, arg);
-	pTcp->_sendState = READY;
-	pTcp->_buffer.clear();
-	pTcp->_txd.clear();
-	return;
+	if ( pTcp) {
+		pTcp->logConn(__FUNCTION__, arg);
+		pTcp->_state = READY;
+		pTcp->_buffer.clear();
+		pTcp->_txd.clear();
 
-	LOGF("TCP: Reconnect %s:%d err : %d", pTcp->_host, pTcp->_remote_port, err);
-	pTcp->right().tell(pTcp->self(), REPLY(DISCONNECT), 0);
-	pTcp->_connected = false;
-}
+
+		LOGF("TCP: Reconnect %s:%d err : %d", pTcp->_host, pTcp->_remote_port, err);
+		pTcp->right().tell(pTcp->self(), REPLY(DISCONNECT), 0);
+		pTcp->_connected = false;
+	}else
+		LOGF("connection not found");
+	}
 
 void Tcp::disconnectCb(void* arg) {
 	struct espconn* pconn = (struct espconn*) arg;
@@ -277,7 +290,7 @@ void Tcp::disconnectCb(void* arg) {
 
 void Tcp::send() { // send buffered data, max 100 bytes
 
-	if (_sendState == READY) {
+	if (_state == READY) {
 		if (_buffer.length()) {
 			// retry send same data
 		} else {
@@ -287,6 +300,7 @@ void Tcp::send() { // send buffered data, max 100 bytes
 		}
 		if (_buffer.length() == 0)
 			return;
+		sends++;
 		int8_t erc = espconn_sent(_conn, _buffer.data(), _buffer.length());
 		if (erc) {
 			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",
@@ -294,7 +308,7 @@ void Tcp::send() { // send buffered data, max 100 bytes
 			disconnect();
 			return;
 		} else {
-			_sendState = SENDING;
+			_state = SENDING;
 			_bytesTxd += _buffer.length();
 			_buffer.clear();
 		}
@@ -305,9 +319,9 @@ void Tcp::send() { // send buffered data, max 100 bytes
 //
 
 void Tcp::writeFinishCb(void* arg) {
-	struct espconn* pconn = (struct espconn*) arg;
-	Tcp *pTcp = findTcp(pconn);
-	pTcp->logConn(__FUNCTION__, arg);
+//	struct espconn* pconn = (struct espconn*) arg;
+//	Tcp *pTcp = findTcp(pconn);
+//	pTcp->logConn(__FUNCTION__, arg);
 
 	return;
 }
@@ -316,12 +330,16 @@ void Tcp::writeFinishCb(void* arg) {
 //
 
 void Tcp::sendCb(void *arg) {
+	sends_cb++;
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
-	pTcp->logConn(__FUNCTION__, arg);
-	pTcp->_sendState = READY;
-	pTcp->send();
-	pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
+	if ( pTcp) {
+		pTcp->_state = READY;
+//		pTcp->send();
+		pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
+	} else {
+		LOGF("Tcp not found");
+	}
 	return;
 }
 
@@ -337,19 +355,9 @@ void Tcp::recvCb(void* arg, char *pdata, unsigned short len) {
 		pTcp->_lastRxd = Sys::millis();
 		Bytes bytes;
 		bytes.map((uint8_t*) pdata, (uint32_t) len);
-//		LOGF(" received : %d bytes",len);
-//		Str str(400);
-//		bytes.toHex(str);
-//		LOGF(" received : %s ",str.c_str());
 		Erc erc;
 		pTcp->right().tell(Header(pTcp->right(), pTcp->self(), RXD, 0),
 				_cborOut.putf("B", &bytes));
-//		if (erc = Msg::queue().putf("uuB", pTcp, SIG_RXD, &bytes)) {
-//			pTcp->_overflowRxd++;
-//		}
-//		LOGF("erc %d bytes.length %d pTcp %X ", erc, bytes.length(), pTcp);
-		pTcp->logConn(__FUNCTION__, arg);
-		return;
 	} else {
 		LOGF(" Tcp not found ");
 	}
@@ -381,7 +389,8 @@ void Tcp::dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg) {
 }
 
 void Tcp::disconnect() {
-	espconn_disconnect(_conn);
+	int erc = espconn_disconnect(_conn);
+	LOGF(" espconn_disconnect() == %d ",erc);
 	_connected = false;
 }
 /*
@@ -410,7 +419,7 @@ void Tcp::onReceive(Header hdr, Cbor& cbor) {
 			PT_YIELD();
 			if (hdr.is(self(), self(), REPLY(CONNECT), 0)) {
 				right().tell(self(), REPLY(CONNECT), 0);
-				_sendState=READY;
+				_state=READY;
 				goto CONNECTED;
 			} else if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) {
 				right().tell(self(), REPLY(DISCONNECT), 0);
