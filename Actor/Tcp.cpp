@@ -168,17 +168,13 @@ Erc Tcp::write(uint8_t* pb, uint32_t length) {
 	logConn(__FUNCTION__, _conn);
 	uint32_t i = 0;
 	if ( _txd.space() < length ) {
-		LOGF(" sends : %d sends_cb : %d ",sends,sends_cb);
+		_overflowTxd++;
+		LOGF(" overflow : sends : %d sends_cb : %d ",sends,sends_cb);
 		return EAGAIN;
 	}
 	while (_txd.hasSpace() && (i < length)) {
 		_txd.write(pb[i++]);
 	};
-	if (i < length) {
-		_overflowTxd++;
-		LOGF("TCP BUFFER OVERFLOW");
-		LOGF(" sends : %d sends_cb : %d ",sends,sends_cb);
-	}
 	send();
 	return E_OK;
 }
@@ -303,8 +299,7 @@ void Tcp::send() { // send buffered data, max 100 bytes
 		sends++;
 		int8_t erc = espconn_sent(_conn, _buffer.data(), _buffer.length());
 		if (erc) {
-			LOGF(" _conn : %X espconn_sent() =  %d , length =%d",
-					_conn, erc, _buffer.length());
+			LOGF(" espconn_sent() =  %d ", erc);
 			disconnect();
 			return;
 		} else {
@@ -335,8 +330,8 @@ void Tcp::sendCb(void *arg) {
 	Tcp *pTcp = findTcp(pconn);
 	if ( pTcp) {
 		pTcp->_state = READY;
-//		pTcp->send();
-		pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
+		pTcp->send();
+//		pTcp->right().tell(pTcp->self(), REPLY(TXD), 0);
 	} else {
 		LOGF("Tcp not found");
 	}
@@ -468,7 +463,9 @@ ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
 _conn->proto.tcp->local_port = espconn_port();
 _conn->proto.tcp->remote_port = _remote_port;
 _conn->reverse = this;
-registerCb(_conn);
+//registerCb(_conn);
+espconn_regist_connectcb(_conn, connectCb);
+
 
 if (StrToIP(_host, _conn->proto.tcp->remote_ip)) {
 	LOGF("TCP: Connect to ip  %s:%d", _host, _remote_port);
@@ -547,7 +544,7 @@ CONNECTED: {
 			/*if ((_lastRxd + 5000) < Sys::millis()) {
 			 LOGF(" timeout - disconnect %X:%X", this, _conn);
 			 disconnect();
-			 }
+			 }registerCb
 			 */
 		} else if (hdr.is(DISCONNECT)) {
 			disconnect();
@@ -580,7 +577,8 @@ void TcpServer::listen() {
 if (espconn_accept(_conn) != ESPCONN_OK) {
 LOGF("ERR : espconn_accept");
 }
-registerCb(_conn);
+//registerCb(_conn);
+espconn_regist_connectcb(_conn, connectCb);
 logConn(__FUNCTION__, _conn);
 }
 //------------------------------------------------------------------------

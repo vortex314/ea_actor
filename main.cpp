@@ -21,7 +21,7 @@ ActorRef mqttFramer;
 ActorRef dwm1000;
 ActorRef config;
 
-#define TAG
+#define TAG1
 
 extern "C" void setup(void) {
 	Serial.begin(115200);
@@ -40,7 +40,7 @@ extern "C" void setup(void) {
 	mqtt = Mqtt::create(mqttFramer,"tag_1/");
 	dwm1000 = DWM1000_Tag::create(mqtt);
 #else
-	mqtt = Mqtt::create("anchor_1/");
+	mqtt = Mqtt::create(mqttFramer,"anchor_1/");
 	dwm1000 = DWM1000_Anchor::create(mqtt);
 #endif
 	System::create(mqtt);

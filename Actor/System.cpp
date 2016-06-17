@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <System.h>
 #include <Json.h>
+#include <Mqtt.h>
 extern "C" {
 #include "user_interface.h"
 }

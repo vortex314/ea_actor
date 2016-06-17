@@ -184,7 +184,7 @@ symbols : $(MAIN_ELF)
 	
 flash: $(MAIN_EXE)
 	$(RESET) $(UPLOAD_PORT)
-#	$(ESP_TOOL) --port $(ESPPORT)  read_mac
+	$(ESPTOOL) --port $(UPLOAD_PORT)  read_mac
 	$(ESPTOOL) --port $(UPLOAD_PORT)  read_flash  0x3F8000 0x100 dump.bin 
 	od --endian=little -X -c dump.bin > $(LOG)
 #	$(ESPTOOL) --port $(UPLOAD_PORT)  erase_flash
