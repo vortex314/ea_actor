@@ -50,26 +50,13 @@ uint8_t Wifi::_wifiStatus = STATION_IDLE;
 
 
 void Wifi::onReceive(Header hdr,Cbor& cbor) {
-//	LOGF("line : %d ",_ptLine);
-// LOGF("msg : %d:%d",msg.src(),msg.signal());
-//	LOGF(" Heap size : %d", system_get_free_heap_size());
 	PT_BEGIN()
 	;
 	INIT: {
 		PT_WAIT_UNTIL(hdr._event==INIT);
 		struct station_config stationConf;
 		int erc;
-//	ets_delay_us(300000);
-//		LOGF("WIFI_INIT");
-//		if ((erc = wifi_set_opmode(STATION_MODE))) {
-//		ets_delay_us(300000);
-//		LOGF("op mode %d", wifi_get_opmode());
-//		LOGF("op mode default %d", wifi_get_opmode_default());
-//		LOGF("phy mode %d", wifi_get_phy_mode());
-//		 wifi_set_opmode(STATION_MODE);
 			wifi_set_opmode_current(STATION_MODE);
-//			ets_delay_us(30000);
-			; // STATIONAP_MODE was STATION_MODE
 			if (wifi_set_phy_mode(PHY_MODE_11B)) { // true or false
 				os_memset(&stationConf, 0, sizeof(struct station_config));
 				ets_strncpy((char*) stationConf.ssid, _ssid,

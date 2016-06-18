@@ -123,20 +123,9 @@ void Tcp::loadEspconn(struct espconn* pconn) {
 	}
 }
 
-void Tcp::logConn(const char* s, void* arg) {
-	struct espconn* pconn = (struct espconn*) arg;
-	return;
-	if (pconn) {
-//	LOGF(" %X:%X %X", this, pconn, pconn->reverse);
-		LOGF(" %s - tcp :  %x  , ip : %d.%d.%d.%d:%d  ",
-				s, pconn->reverse, pconn->proto.tcp->remote_ip[0], pconn->proto.tcp->remote_ip[1], pconn->proto.tcp->remote_ip[2], pconn->proto.tcp->remote_ip[3], pconn->proto.tcp->remote_port);
-	}
-}
-
 void Tcp::registerCb(struct espconn* pconn) {
 
 	pconn->reverse = this;
-	logConn(__FUNCTION__, pconn);
 //	espconn_regist_time(pconn, 10, 1);		// disconnect after 1000 sec
 	espconn_regist_connectcb(pconn, connectCb);
 	espconn_regist_disconcb(pconn, disconnectCb);
@@ -165,7 +154,6 @@ Erc Tcp::write(Bytes& bytes) {
 
 Erc Tcp::write(uint8_t* pb, uint32_t length) {
 //	LOGF(" sending : %d bytes", length);
-	logConn(__FUNCTION__, _conn);
 	uint32_t i = 0;
 	if ( _txd.space() < length ) {
 		_overflowTxd++;
@@ -213,7 +201,6 @@ void Tcp::connectCb(void* arg) {
 	if (pTcp) {
 
 		pTcp->loadEspconn(pconn);
-		pTcp->logConn(__FUNCTION__, arg);
 		pTcp->registerCb(pconn);
 		pTcp->_state = READY;
 
@@ -252,7 +239,6 @@ void Tcp::reconnectCb(void* arg, int8_t err) {
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = findTcp(pconn);
 	if ( pTcp) {
-		pTcp->logConn(__FUNCTION__, arg);
 		pTcp->_state = READY;
 		pTcp->_buffer.clear();
 		pTcp->_txd.clear();
@@ -270,7 +256,6 @@ void Tcp::disconnectCb(void* arg) {
 
 	Tcp *pTcp = findTcp(pconn);
 	if (pTcp) {
-		pTcp->logConn(__FUNCTION__, arg);
 		pTcp->_connected = false;
 		if (pTcp->getType() == LIVE) {
 			pTcp->loadEspconn(0);
@@ -316,7 +301,6 @@ void Tcp::send() { // send buffered data, max 100 bytes
 void Tcp::writeFinishCb(void* arg) {
 //	struct espconn* pconn = (struct espconn*) arg;
 //	Tcp *pTcp = findTcp(pconn);
-//	pTcp->logConn(__FUNCTION__, arg);
 
 	return;
 }
@@ -366,7 +350,6 @@ void Tcp::dnsFoundCb(const char *name, ip_addr_t *ipaddr, void *arg) {
 //	Tcp *pTcp = findTcp((struct espconn*) arg);
 	struct espconn* pconn = (struct espconn*) arg;
 	Tcp *pTcp = (Tcp*) (pconn->reverse);
-	pTcp->logConn(__FUNCTION__, arg);
 
 	if (ipaddr == NULL) {
 		LOGF("DNS: Found, but got no ip, try to reconnect");
@@ -483,103 +466,108 @@ return ActorRef(new TcpClient(host, port));
 
 TcpClient::TcpClient(const char* host, uint16_t port) :
 	Tcp() {
-LOGF("this : %X ", this);
-strncpy(_host, host, sizeof(_host));
-_remote_port = port;
-logConn(__FUNCTION__, _conn);
-setType(CLIENT);
-_conn = new (struct espconn);
-_remote_ip.addr = 0; // should be zero for dns callback to work
-_connected = false;
-ets_memset(_conn, 0, sizeof(_conn));
-_conn->type = ESPCONN_TCP;
-_conn->state = ESPCONN_NONE;
-_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
-ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
-_connected = true; // don't reallocate master client
+	LOGF("ctor : %X ", this);
+	strncpy(_host, host, sizeof(_host));
+	_remote_port = port;
+	setType(CLIENT);
+	_conn = new (struct espconn);
+	_remote_ip.addr = 0; // should be zero for dns callback to work
+	_connected = false;
+	ets_memset(_conn, 0, sizeof(_conn));
+	_conn->type = ESPCONN_TCP;
+	_conn->state = ESPCONN_NONE;
+	_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
+	ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
+	_connected = true; // don't reallocate master client
 }
+
+static enum State {
+	S_INIT,S_WIFI_DISCONNECTED,S_TCP_DISCONNECTED,S_WIFI_CONNECTED,S_TCP_CONNECTED,S_RECONNECT_WAIT
+} _state=S_INIT;
+
+void state(State nw){
+	_state=nw;
+}
+
+int state(){
+	return _state;
+}
+
 
 void TcpClient::onReceive(Header hdr, Cbor& cbor) {
-PT_BEGIN()
-WIFI_DISCONNECTED: {
-	while (true) {
-		PT_YIELD();
+	switch(state()) {
+	case S_INIT: {
+		if ( hdr.is(INIT) ) {
+			state(S_WIFI_DISCONNECTED);
+		}
+		break;
+	}
+	case S_WIFI_DISCONNECTED :{
 		if (hdr.is(self(), left(), REPLY(CONNECT), 0)) {
-			LOGF("TcpClient started. %x", this);
-			goto CONNECTING;
-		}
+			connect();
+			state(S_TCP_DISCONNECTED);
+			}
+		break;
 	}
-}
-CONNECTING: {
-	while (true) {
-		connect();
-		PT_YIELD();
-		if (hdr.is(self(), self(), REPLY(CONNECT), 0)) {
+	case S_TCP_DISCONNECTED :{
+		if (hdr.is(self(), self(), REPLY(CONNECT),0)) { 		// TCP connect established
 			right().tell(self(), REPLY(CONNECT), 0);
-			goto CONNECTED;
-		} else if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) {
-			right().tell(self(), REPLY(DISCONNECT), 0);
-			goto WIFI_DISCONNECTED;
+			state(S_TCP_CONNECTED);
+		} else if (hdr.is(self(), left(), REPLY(DISCONNECT), 0)) { // WIFI disconnected
+			state(S_WIFI_DISCONNECTED);
+			};
+		break;
 		}
-
-	}
-}
-CONNECTED: {
-	while (true) {
-		setReceiveTimeout(5000);
-		PT_YIELD();
-		if (hdr.is(self(), self(), REPLY(DISCONNECT), 0)) { // tcp link gone, callback was called
-			right().tell(self(), REPLY(DISCONNECT), 0);
-			goto CONNECTING;
-		} else if (hdr.is(left(), self(), REPLY(DISCONNECT), 0)) { // wifi link gone
-			right().tell(self(), REPLY(DISCONNECT), 0);
-			goto WIFI_DISCONNECTED;
-		} else if (hdr.is(TXD)) {
-//			LOGF(" cbor length : %d offset : %d", cbor.length(), cbor.offset())
+	case S_TCP_CONNECTED :{
+		if (hdr.is(right(),TXD)) {
 			Bytes data(256);
 			cbor.get(data);
 			write(data);
-		} else if (hdr.is(TIMEOUT)) {
-			//			LOGF("%d:%d %d", _lastRxd + 5000, Sys::millis());
-			/*if ((_lastRxd + 5000) < Sys::millis()) {
-			 LOGF(" timeout - disconnect %X:%X", this, _conn);
-			 disconnect();
-			 }registerCb
-			 */
-		} else if (hdr.is(DISCONNECT)) {
+		} else if (hdr.is(right(),DISCONNECT)) {	// listener demands disconnect
 			disconnect();
+			state(S_RECONNECT_WAIT);
+			setReceiveTimeout(2000);
+			}
+		else if (hdr.is(left(),REPLY(DISCONNECT))) { // WIFI disconnected
+			state(S_WIFI_DISCONNECTED);
 		}
+		break;
 	}
-}
-PT_END()
+	case S_RECONNECT_WAIT:{
+		if ( hdr.is(TIMEOUT))
+		{
+			connect();
+			state(S_TCP_DISCONNECTED);
+		}
+		break;
+	}
+	}
+	return;
 }
 
 TcpServer::TcpServer(uint16_t port) :
 Tcp() {
-LOGF("this : %X ", this);
-_local_port = port;
-_conn->proto.tcp->local_port = _local_port;
-setType(SERVER);
-_conn = new (struct espconn);
-ets_memset(_conn, 0, sizeof(_conn));
-_conn->type = ESPCONN_TCP;
-_conn->state = ESPCONN_NONE;
-_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
-ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
-_local_port = 23;
-_conn->reverse = (Tcp*) this;
-logConn(__FUNCTION__, _conn);
-_connected = true; // to allocate TCP instance
+	LOGF("this : %X ", this);
+	_local_port = port;
+	_conn->proto.tcp->local_port = _local_port;
+	setType(SERVER);
+	_conn = new (struct espconn);
+	ets_memset(_conn, 0, sizeof(_conn));
+	_conn->type = ESPCONN_TCP;
+	_conn->state = ESPCONN_NONE;
+	_conn->proto.tcp = (esp_tcp *) malloc(sizeof(esp_tcp));
+	ets_memset(_conn->proto.tcp, 0, sizeof(esp_tcp));
+	_local_port = 23;
+	_conn->reverse = (Tcp*) this;
+	_connected = true; // to allocate TCP instance
 }
 
 //------------------------------------------------------------------------
 void TcpServer::listen() {
-if (espconn_accept(_conn) != ESPCONN_OK) {
-LOGF("ERR : espconn_accept");
-}
-//registerCb(_conn);
-espconn_regist_connectcb(_conn, connectCb);
-logConn(__FUNCTION__, _conn);
+	if (espconn_accept(_conn) != ESPCONN_OK) {
+		LOGF("ERR : espconn_accept");
+	}
+	espconn_regist_connectcb(_conn, connectCb);
 }
 //------------------------------------------------------------------------
 void TcpServer::onReceive(Header hdr, Cbor& cbor) {

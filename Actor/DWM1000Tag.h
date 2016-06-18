@@ -29,6 +29,7 @@ public:
 	static bool interrupt_detected;
 	static void my_dwt_isr();bool isInterruptDetected();
 	void clearInterrupt();
+	void publish(uint8_t qos, const char* key, Str& value);
 };
 
 #endif /* DWM1000TAG_H_ */

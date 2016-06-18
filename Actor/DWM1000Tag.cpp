@@ -267,11 +267,16 @@ bool DWM1000_Tag::subscribed(Header hdr) {
 			|| hdr.is(_mqtt, REPLY(DISCONNECT));
 }
 
+void DWM1000_Tag::publish(uint8_t qos, const char* key, Str& value) {
+	if ( _mqttConnected ) _mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
+}
+
 static int _timeoutCounter = 0;
 //___________________________________________________
 //
 
 void DWM1000_Tag::sendPoll() {
+	LOGF("");
 	/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
 	tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
 	dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
@@ -291,6 +296,7 @@ void DWM1000_Tag::sendPoll() {
 //___________________________________________________
 //
 void DWM1000_Tag::sendFinal() {
+	LOGF("");
 	uint32 final_tx_time;
 
 	/* Retrieve poll transmission and response reception timestamp. */

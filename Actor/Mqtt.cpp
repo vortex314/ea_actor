@@ -112,8 +112,8 @@ MqttConnector::MqttConnector(ActorRef framer,ActorRef mqtt, const char* prefix) 
 }
 
 void MqttConnector::init() {
-	ActorRef::byPath("Config").tell(self(), CONFIG, RXD,
-			_cborOut.putf("s", "mqtt/clientId"));
+/*	ActorRef::byPath("Config").tell(self(), CONFIG, RXD,
+			_cborOut.putf("s", "mqtt/clientId"));*/
 	sprintf((char*) _clientId, "ESP%X", system_get_chip_id());
 }
 
@@ -131,6 +131,7 @@ void MqttConnector::onReceive(Header hdr, Cbor& cbor) {
 	lwtTopic.append(_prefix).append("system/online");
 	PT_BEGIN()
 		PT_WAIT_UNTIL(hdr.is(INIT, E_OK));
+		init();
 	DISCONNECTED: {
 		PT_WAIT_UNTIL(hdr.is(_framer,REPLY(CONNECT)));
 		}
@@ -271,7 +272,7 @@ void MqttPublisher::sendPublish() {
 
 	_mqttOut.Publish(header, _fullTopic, _message, _messageId);
 	_framer.tell(Header(_framer, _mqtt, TXD, 0), _cborOut.putf("B", &_mqttOut));
-	LOGF(" TOPIC %s ",_fullTopic.c_str());
+//	LOGF(" TOPIC %s ",_fullTopic.c_str());
 }
 
 void MqttPublisher::sendPubRel() {

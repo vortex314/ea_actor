@@ -337,6 +337,10 @@ bool ActorRef::operator==(ActorRef ref){
 	return ref._idx == _idx;
 }
 
+bool ActorRef::operator!=(ActorRef ref){
+	return ref._idx != _idx;
+}
+
 void ActorRef::tell(Header header, Cbor& data) {
 	actor().tell(header, data);
 }

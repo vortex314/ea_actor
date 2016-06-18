@@ -129,6 +129,7 @@ public:
 	}
 	static ActorRef byPath(const char* path);
 	bool operator==(ActorRef ref);
+	bool operator!=(ActorRef ref);
 };
 
 class Actor {

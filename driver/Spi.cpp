@@ -178,7 +178,7 @@ void Spi::clock(uint16 prediv, uint8 cntdiv) {
 #include <Arduino.h>
 #include <gpio_c.h>
 
-void Spi::set_hw_cs(bool use) {
+ICACHE_RAM_ATTR void Spi::set_hw_cs(bool use) {
 	if (use) {
 		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 		//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
@@ -189,11 +189,11 @@ void Spi::set_hw_cs(bool use) {
 	}
 }
 // D8 == GPIO PIN 15
-void Spi::cs_select() {
+ICACHE_RAM_ATTR void Spi::cs_select() {
 	digitalWrite(D8, 0);
 }
 
-void Spi::cs_deselect() {
+ICACHE_RAM_ATTR void Spi::cs_deselect() {
 	digitalWrite(D8, 1);
 }
 
@@ -280,7 +280,7 @@ void Spi::rx_byte_order(uint8 byte_order) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data, uint32 addr_bits,
+ICACHE_RAM_ATTR uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data, uint32 addr_bits,
 		uint32 addr_data, uint32 dout_bits, uint32 dout_data, uint32 din_bits,
 		uint32 dummy_bits) {
 
@@ -498,7 +498,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-extern "C" int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
+ extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
 		const uint8 *buffer) {
 
 //	LOGF("head : %s", bytesToHex(hbuff, hLen));
@@ -521,7 +521,7 @@ extern "C" int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
 //
 /////////////////////////////////////////////////////////////////////////////////
 
-extern "C" int readfromspi(uint16 hLen, const uint8 *hbuff, uint32 bLen, uint8 *buffer) {
+ extern "C" int ICACHE_RAM_ATTR readfromspi(uint16 hLen, const uint8 *hbuff, uint32 bLen, uint8 *buffer) {
 	uint32_t i;
 //	LOGF("head : %s", bytesToHex(hbuff, hLen));
 	Spi spi(1);

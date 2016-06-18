@@ -11,8 +11,8 @@
 #include <MqttMsg.h>
 #include <MqttConstants.h>
 
-#define TIME_KEEP_ALIVE 2000
-#define TIME_PING 1000
+#define TIME_KEEP_ALIVE 20000
+#define TIME_PING 7000
 #define MQTT_PUB_MAX_RETRIES 3
 #define MQTT_TIME_WAIT_REPLY 1000
 #define MQTT_TOPIC_MAX_LENGTH 40

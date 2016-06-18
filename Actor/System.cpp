@@ -54,7 +54,7 @@ void System::onReceive(Header hdr, Cbor& data) {
 	};
 	switch (hdr._event) {
 	case TIMEOUT: {
-		setReceiveTimeout(50);
+		setReceiveTimeout(2000);
 		json.clear();
 		json.add(true);
 		publish(0, "system/online", json);
