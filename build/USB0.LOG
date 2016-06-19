@@ -7,23 +7,25 @@
 
 
  Started ....
-253 | static void Actor::setup():138 	|  CborQueue 3FFF1DE4:0 
-253 | Tcp::Tcp():19 	| this : 3FFF2304 
-253 | TcpClient::TcpClient(const char*, uint16_t):469 	| ctor : 3FFF2304 
-259 | virtual void Actor::onReceive(Header, Cbor&):182 	|  Default handler event ? Dummy => INIT => Dummy
-271 | virtual void MqttPublisher::onReceive(Header, Cbor&):295 	| DISCONNECTED
-275 | void DWM1000_Anchor::init():232 	| HSPI
-279 | void DWM1000_Anchor::resetChip():156 	|  Reset DWM1000_Anchor 
-305 | void DWM1000_Anchor::initSpi():196 	| Init SPI 
-305 | void DWM1000_Anchor::enableIsr():188 	|  IRQ SET 
-308 | void DWM1000_Anchor::init():243 	| EUID : 1331654527
-312 | void DWM1000_Anchor::init():247 	| EUID : 1331654527
-2453 | void DWM1000_Anchor::init():259 	|  dwt_initialise done.
-2473 | void DWM1000_Anchor::init():263 	|  dwt_configure done.
-2475 | void DWM1000_Anchor::init():270 	|  device id : DECA0130, part id :10000799, lot_id :10205EA9
-6528 | virtual void Wifi::onReceive(Header, Cbor&):105 	| IP Address : 192.168.0.173
-6528 | uint8_t StrToIP(const char*, void*):623 	|  convert  Ip address : test.mosquitto.org
-6532 | void TcpClient::connect():457 	| TCP: Connect to domain test.mosquitto.org:1883
-6568 | static void Tcp::dnsFoundCb(const char*, ip_addr_t*, void*):359 	| DNS: found ip 85.119.83.194
-6569 | static void Tcp::dnsFoundCb(const char*, ip_addr_t*, void*):365 	| TCP: connecting...
-6626 | virtual void Actor::onReceive(Header, Cbor&):182 	|  Default handler event ? Mqtt => REPLY(CONNECT) => Dummy
+257 | static void Actor::setup():138 	|  CborQueue 3FFF1D54:0 
+257 | Tcp::Tcp():19 	| this : 3FFF227C 
+257 | TcpClient::TcpClient(const char*, uint16_t):469 	| ctor : 3FFF227C 
+264 | virtual void Actor::onReceive(Header, Cbor&):182 	|  Default handler event ? Dummy => INIT => Dummy
+275 | virtual void MqttPublisher::onReceive(Header, Cbor&):295 	| DISCONNECTED
+279 | void DWM1000_Anchor::init():231 	| HSPI
+283 | void DWM1000_Anchor::resetChip():161 	|  Reset DWM1000_Anchor 
+309 | void DWM1000_Anchor::init():235 	|  IRQ pin : 0 
+309 | void DWM1000_Anchor::initSpi():200 	| Init SPI 
+310 | void DWM1000_Anchor::enableIsr():192 	|  IRQ SET 
+315 | void DWM1000_Anchor::init():243 	| EUID : 1331654527
+321 | void DWM1000_Anchor::init():247 	| EUID : 1331654527
+2462 | void DWM1000_Anchor::init():259 	|  dwt_initialise done.
+2482 | void DWM1000_Anchor::init():263 	|  dwt_configure done.
+2483 | void DWM1000_Anchor::init():270 	|  device id : DECA0130, part id :10000799, lot_id :10205EA9
+11578 | virtual void Wifi::onReceive(Header, Cbor&):95 	| NOT CONNECTED
+16590 | virtual void Wifi::onReceive(Header, Cbor&):105 	| IP Address : 192.168.0.173
+16590 | uint8_t StrToIP(const char*, void*):623 	|  convert  Ip address : test.mosquitto.org
+16597 | void TcpClient::connect():457 	| TCP: Connect to domain test.mosquitto.org:1883
+16628 | static void Tcp::dnsFoundCb(const char*, ip_addr_t*, void*):359 	| DNS: found ip 85.119.83.194
+16629 | static void Tcp::dnsFoundCb(const char*, ip_addr_t*, void*):365 	| TCP: connecting...
+16746 | virtual void Actor::onReceive(Header, Cbor&):182 	|  Default handler event ? Mqtt => REPLY(CONNECT) => Dummy

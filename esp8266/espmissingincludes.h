@@ -9,8 +9,13 @@
 #define ESPMISSINGINCLUDES_H_
 
 #include "stdint.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include <ets_sys.h>
+
 
 //Missing function prototypes in include folders. Gcc will warn on these if we don't define 'em anywhere.
 //MOST OF THESE ARE GUESSED! but they seem to swork and shut up the compiler.
@@ -47,6 +52,8 @@ void ets_intr_lock(void);
 void ets_intr_unlock(void);
 void wdt_feed(void);
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ESPMISSINGINCLUDES_H_ */

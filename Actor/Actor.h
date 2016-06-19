@@ -144,6 +144,7 @@ private:
 	static uint32_t _count;
 	static Actor* _dummy;
 	static CborQueue* _cborQueue;
+	uint32_t _state;
 
 protected:
 	LineNumber _ptLine;
@@ -186,6 +187,12 @@ public:
 	}
 	bool timeout();
 	void setReceiveTimeout(uint32_t time);
+	inline void state(int st){
+		_state=st;
+	}
+	inline int state() {
+		return _state;
+	}
 };
 
 #endif /* ACTOR_H_ */

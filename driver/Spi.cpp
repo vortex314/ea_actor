@@ -511,7 +511,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 		spi.transaction( 8, hbuff[i], 0, 0, 0, 0, 0, 0);
 	for (i = 0; i < bLen; i++)
 		spi.transaction( 8, buffer[i], 0, 0, 0, 0, 0, 0);
-	delay(1);
+	ets_delay_us(1000);
 	spi.cs_deselect();
 	return 0;
 }
@@ -531,7 +531,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 		spi.transaction( 0, 0, 0, 0, 8, hbuff[i], 0, 0);
 	for (i = 0; i < bLen; i++)
 		buffer[i] = spi.transaction( 0, 0, 0, 0, 0, 0, 8, 0);
-	delay(1);
+	ets_delay_us(1000);
 	spi.cs_deselect();
 //	LOGF("data : %s", bytesToHex(buffer, bLen));
 	return 0;

@@ -9,12 +9,31 @@
 #define DWM1000_Anchor_H_
 
 #include <Actor.h>
+extern "C" {
+#include <Spi.h>
+#include <gpio_c.h>
+#include <espmissingincludes.h>
+#include <osapi.h>
+#include "deca_device_api.h"
+#include "deca_regs.h"
+#include "deca_sleep.h"
+};
 
 class DWM1000_Anchor: public Actor {
 	uint32_t _count;
-	static uint32_t _status_reg;
+//	static uint32_t _status_reg;
 	ActorRef _mqtt;
 	bool _mqttConnected;
+	const char* _status;
+	uint32_t _pollsReceived;
+	uint32_t _pollsForAnchor;
+	uint32_t _replySend;
+	uint32_t _finalReceived;
+	uint32_t _finalForAnchor;
+	uint32_t _interrupts;
+	enum State {
+		S_START,S_POLL_WAIT,S_REPLY_SEND,S_FINAL_WAIT,S_FINAL_SEND
+	};
 public:
 	DWM1000_Anchor(ActorRef mqtt);
 	static ActorRef create(ActorRef mqtt);
@@ -28,6 +47,13 @@ public:
 	static void my_dwt_isr();
 	bool isInterruptDetected();
 	void clearInterrupt();
+	static void rxcallback(const dwt_callback_data_t * data);
+	static void txcallback(const dwt_callback_data_t * data);
+	void publish();
+	bool receivePollForAnchor();
+	bool receiveFinalForAnchor();
+	void calcDistance();
+	void sendReply();
 
 	bool subscribed(Header);
 	void onReceive(Header ,Cbor&);

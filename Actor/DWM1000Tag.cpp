@@ -8,16 +8,6 @@
 #include <DWM1000Tag.h>
 #include <Json.h>
 
-extern "C" {
-#include <Spi.h>
-#include <gpio_c.h>
-#include <espmissingincludes.h>
-#include <osapi.h>
-#include "deca_device_api.h"
-#include "deca_regs.h"
-#include "deca_sleep.h"
-}
-;
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 1000
 
@@ -88,16 +78,13 @@ static uint8 frame_seq_nb = 0;
 #define RX_BUF_LEN 20
 static uint8 rx_buffer[RX_BUF_LEN];
 
-/* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
-static uint32 status_reg = 0;
-
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
  * 1 uus = 512 / 499.2 µs and 1 µs = 499.2 * 128 dtu. */
 #define UUS_TO_DWT_TIME 65536
 
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-#define POLL_TX_TO_RESP_RX_DLY_UUS 150
+#define POLL_TX_TO_RESP_RX_DLY_UUS 150 // was 150
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
@@ -115,12 +102,19 @@ static uint64 final_tx_ts;
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
+DWM1000_Tag* gTag = 0;
 
 DWM1000_Tag::DWM1000_Tag(ActorRef mqtt) :
 		Actor("DWM1000_Tag") {
 	_count = 0;
 	_mqtt = mqtt;
 	_mqttConnected = false;
+	gTag = this;
+	_interrupts = 0;
+	_pollsSend = 0;
+	_finalSend = 0;
+	_replyReceived = 0;
+	state(S_START);
 }
 
 ActorRef DWM1000_Tag::create(ActorRef mqtt) {
@@ -144,30 +138,30 @@ void DWM1000_Tag::resetChip() {
 //_________________________________________________ IRQ handler
 //
 bool DWM1000_Tag::interrupt_detected = false;
-uint32_t DWM1000_Tag::_status_reg = 0;
-static int interruptCount = 0;
-ICACHE_RAM_ATTR void DWM1000_Tag::my_dwt_isr() {
-	interrupt_detected = true;
-	_status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR | SYS_STATUS_RXFCG);
-	interruptCount++;
-}
 
-bool DWM1000_Tag::isInterruptDetected() {
-	return interrupt_detected;
-}
+/*
+ ICACHE_RAM_ATTR void DWM1000_Tag::my_dwt_isr() {
+ interrupt_detected = true;
+ gTag->_status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+ dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR | SYS_STATUS_RXFCG);
+ interruptCount++;
+ }
 
-void DWM1000_Tag::clearInterrupt() {
-	interrupt_detected = false;
-}
+ bool DWM1000_Tag::isInterruptDetected() {
+ return interrupt_detected;
+ }
 
+ void DWM1000_Tag::clearInterrupt() {
+ interrupt_detected = false;
+ }
+ */
 //_________________________________________________ Configure IRQ pin
 //
 void DWM1000_Tag::enableIsr() {
 	LOGF( " IRQ SET ");
 	int pin = D2; // IRQ PIN = D2 = GPIO4
 	pinMode(pin, 0); // INPUT
-	attachInterrupt(pin, my_dwt_isr, CHANGE);
+	attachInterrupt(pin, dwt_isr, CHANGE); // was CHANGE
 }
 //_________________________________________________ INITIALIZE SPI
 //
@@ -200,14 +194,10 @@ void DWM1000_Tag::initSpi() {
 }
 //___________________________________________________
 //
-void tag_txcallback(const dwt_callback_data_t * data) {
-	interruptCount++;
+void DWM1000_Tag::txcallback(const dwt_callback_data_t * data) {
 }
 //___________________________________________________
 //
-void tag_rxcallback(const dwt_callback_data_t * data) {
-	interruptCount++;
-}
 //___________________________________________________
 //
 void DWM1000_Tag::init() {
@@ -215,6 +205,7 @@ void DWM1000_Tag::init() {
 //_________________________________________________INIT SPI ESP8266
 
 	resetChip();
+	LOGF(" IRQ pin : %d ", digitalRead(D2));
 	initSpi();
 	enableIsr();
 
@@ -236,12 +227,10 @@ void DWM1000_Tag::init() {
 
 	if (dwt_initialise(DWT_LOADUCODE)) {
 		LOGF( " dwt_initialise failed ");
-	} else
-		LOGF( " dwt_initialise done.");
+	};
 	if (dwt_configure(&config)) {
 		LOGF( " dwt_configure failed ");
-	} else
-		LOGF( " dwt_configure done.");
+	};
 
 	uint32_t device_id = dwt_readdevid();
 	uint32_t part_id = dwt_getpartid();
@@ -256,7 +245,8 @@ void DWM1000_Tag::init() {
 	 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
 	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
 	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
-	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
+	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable interr
+	dwt_setcallbacks(txcallback, rxcallback); // set interr callbacks
 
 	_count = 0;
 }
@@ -267,28 +257,50 @@ bool DWM1000_Tag::subscribed(Header hdr) {
 			|| hdr.is(_mqtt, REPLY(DISCONNECT));
 }
 
-void DWM1000_Tag::publish(uint8_t qos, const char* key, Str& value) {
-	if ( _mqttConnected ) _mqtt.tell(self(), PUBLISH, qos, _cborOut.putf("sB", key, &value));
+void DWM1000_Tag::publish() {
+	static uint32_t count = 0;
+	if (count++ % 100)
+		return; // publish only each 100 calls
+	if (_mqttConnected) {
+		Json json(20);
+		Bytes* js = &json;
+		json.clear();
+		json.add(_pollsSend);
+		_mqtt.tell(self(), PUBLISH, 0,
+				_cborOut.putf("sB", "dwm1000/pollsSend", js));
+		json.clear();
+		json.add(_replyReceived);
+		_mqtt.tell(self(), PUBLISH, 0,
+				_cborOut.putf("sB", "dwm1000/replyReceived", js));
+		json.clear();
+		json.add(_finalSend);
+		_mqtt.tell(self(), PUBLISH, 0,
+				_cborOut.putf("sB", "dwm1000/finalSend", js));
+
+		json.clear();
+		json.add(_interrupts);
+		_mqtt.tell(self(), PUBLISH, 0,
+				_cborOut.putf("sB", "dwm1000/interrupts", js));
+	}
 }
 
-static int _timeoutCounter = 0;
 //___________________________________________________
 //
 
 void DWM1000_Tag::sendPoll() {
-	LOGF("");
-	/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
-	tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-	dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
-	dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
-
 	/* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
 	 * set by dwt_setrxaftertxdelay() has elapsed. */
-	dwt_setinterrupt(DWT_INT_TFRS, 0);
+	dwt_setinterrupt(DWT_INT_TFRS, 0); // disabled , is 0
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
-	clearInterrupt();
-	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED); // SEND POLL MSG
-	_timeoutCounter = 0;
+	/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
+	tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+	if (dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0))
+		LOGF("");
+	if (dwt_writetxfctrl(sizeof(tx_poll_msg), 0))
+		LOGF("");
+	if (dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED))
+		LOGF("");
+	// SEND POLL MSG
 
 	/* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 8 below. */
 
@@ -296,9 +308,9 @@ void DWM1000_Tag::sendPoll() {
 //___________________________________________________
 //
 void DWM1000_Tag::sendFinal() {
-	LOGF("");
 	uint32 final_tx_time;
 
+	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
 	/* Retrieve poll transmission and response reception timestamp. */
 	poll_tx_ts = get_tx_timestamp_u64();
 	resp_rx_ts = get_rx_timestamp_u64();
@@ -323,7 +335,53 @@ void DWM1000_Tag::sendFinal() {
 	dwt_starttx(DWT_START_TX_DELAYED); // SEND FINAL MSG
 }
 
-//extern "C" char* bytesToHex(uint8_t* pb, uint32_t len);
+//_______________________________________________________________
+//
+bool DWM1000_Tag::receiveReplyForTag() {
+	frame_seq_nb++; /* Increment frame sequence number after transmission of the poll message (modulo 256). */
+	uint32 frame_len;
+
+	/* Clear good RX frame event and TX frame sent in the DW1000 status register. */
+	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+
+	/* A frame has been received, read iCHANGEt into the local buffer. */
+	frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+	if (frame_len <= RX_BUF_LEN) {
+		dwt_readrxdata(rx_buffer, frame_len, 0);
+	}
+
+	/* Check that the frame is the expected response from the companion "DS TWR responder" example.
+	 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+	rx_buffer[ALL_MSG_SN_IDX] = 0;
+	if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) { // CHECK RESP MSG
+		return true;
+	}
+	return false;
+
+}
+//______________________________________________________________________
+//
+void DWM1000_Tag::rxcallback(const dwt_callback_data_t * data) {
+	if (gTag) {
+		DWM1000_Tag& tag = *gTag;
+		tag._interrupts++;
+		switch (tag.state()) {
+		case S_REPLY_WAIT: {
+			tag._replyReceived++;
+			if (tag.receiveReplyForTag()) {
+				tag._replyForTag++;
+				tag.sendFinal();
+				tag._finalSend++;
+				tag.setReceiveTimeout(10);
+				tag.state(S_START);
+			}
+			break;
+		}
+
+		}
+
+	}
+}
 
 void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 	if (hdr.is(_mqtt, REPLY(CONNECT))) {
@@ -336,60 +394,49 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 		return;
 	} else if (hdr.is(INIT)) {
 		init();
+		setReceiveTimeout(1000); // delay  between POLL
+
 	};
+	switch (state()) {
+	case S_START: {
+		setReceiveTimeout(10); // delay  between POLL
+		state(S_REPLY_WAIT);
+		sendPoll();
+		break;
+	}
+	case S_REPLY_WAIT: {
+		if (hdr.is(TIMEOUT)) {
+			setReceiveTimeout(10);
+			state(S_START);
+		}
+		break;
+	}
+
+	}
+	return;
 	Json json(20);
 	static uint32_t polls = 0;
 	PT_BEGIN()
 
 	POLL_SEND: {
 		while (true) {
-			setReceiveTimeout(3000); // delay  between POLL
+			publish();
+			setReceiveTimeout(10); // delay  between POLL
 			PT_YIELD_UNTIL(hdr.is(TIMEOUT));
 			sendPoll();
+			_pollsSend++;
 			setReceiveTimeout(10);
-			PT_YIELD_UNTIL(hdr.is(TIMEOUT) || isInterruptDetected());
-			// WAIT RESP MSG
-
-			if (isInterruptDetected())
-				LOGF( " INTERRUPT DETECTED ");
-
-			status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-			LOGF( " SYS_STATUS :%X", status_reg);
-			if (status_reg == 0xDEADDEAD) {
-				LOGF(" DWM1000 unreachable ");
-				init();
-			} else if (status_reg & SYS_STATUS_RXFCG)
+			PT_YIELD_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD));
+			if (hdr.is(TIMEOUT)) {
+				LOGF(" timeout poll reply ");
+				continue;
+			}
+			if (hdr.is(RXD))
 				goto RESP_RECEIVED;
-			else if (status_reg & SYS_STATUS_ALL_RX_ERR) {
-				if (status_reg & SYS_STATUS_RXRFTO) {
-					LOGF(" RX Timeout");
-				} else {
-					LOGF(" RX error ");
-				}
-				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
-				/* Clear RX error events in the DW1000 status register. */
-
-			}
-			LOGF( " status reg.:%X,interrupts : %X",
-					status_reg, interruptCount);
-			if (_mqttConnected) {
-				json.add(polls++);
-				Bytes* js = &json;
-				_mqtt.tell(self(), PUBLISH, 0,
-						_cborOut.putf("sB", "dwm1000/polls", js));
-
-				json.clear();
-				json.add(interruptCount);
-				_mqtt.tell(self(), PUBLISH, 0,
-						_cborOut.putf("sB", "dwm1000/interrupts", js));
-			}
-
 		}
 
 	}
 	RESP_RECEIVED: {
-
-		LOGF( " Received RESPONSE !!!");
 
 		frame_seq_nb++; /* Increment frame sequence number after transmission of the poll message (modulo 256). */
 		uint32 frame_len;
@@ -407,21 +454,19 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 		 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
 		rx_buffer[ALL_MSG_SN_IDX] = 0;
 		if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) { // CHECK RESP MSG
-			sendFinal();
-			/* Poll DW1000 until TX frame sent event set. See NOTE 8 below. */
+			_replyReceived++;
 			setReceiveTimeout(10);
-			PT_YIELD_UNTIL(
-					(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS) || hdr.is(TIMEOUT));
+			sendFinal();
+			_finalSend++;
+			PT_YIELD_UNTIL(hdr.is(RXD) || hdr.is(TIMEOUT));
 			;
 			/* Clear TXFRS event. */
-			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
+//			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 			/* Increment frame sequence number after transmission of the final message (modulo 256). */
 			frame_seq_nb++;
 		} else {
 			LOGF(" not expected response ");
 		}
-//			deca_sleep(RNG_DELAY_MS);
 	}
 	goto POLL_SEND;
 
