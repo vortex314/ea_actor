@@ -169,7 +169,7 @@ void DWM1000_Anchor::resetChip() {
 }
 //_________________________________________________ IRQ handler
 //
-bool DWM1000_Anchor::interrupt_detected = false;
+//bool DWM1000_Anchor::interrupt_detected = false;
 // uint32_t DWM1000_Anchor::_status_reg = 0;
 /*
  ICACHE_RAM_ATTR void DWM1000_Anchor::my_dwt_isr() {
@@ -279,7 +279,7 @@ void DWM1000_Anchor::init() {
 	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
 	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
-	dwt_initialise(DWT_LOADUCODE);
+//	dwt_initialise(DWT_LOADUCODE);
 	// Configure the callbacks from the dwt library
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable interr
 	dwt_setcallbacks(txcallback, rxcallback); // set interr callbacks
@@ -329,7 +329,7 @@ void DWM1000_Anchor::publish() {
 }
 
 
-void DWM1000_Anchor::calcDistance() {
+ void DWM1000_Anchor::calcDistance() {
 	_finalReceived++;
 	uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
 	uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
@@ -361,7 +361,7 @@ void DWM1000_Anchor::calcDistance() {
 }
 //______________________________________________________________________
 //
-bool DWM1000_Anchor::receivePollForAnchor() {
+  bool DWM1000_Anchor::receivePollForAnchor() {
 	uint32 frame_len;
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
 	/* Clear good RX frame event in the DW1000 status register. */
@@ -381,7 +381,7 @@ bool DWM1000_Anchor::receivePollForAnchor() {
 }
 //______________________________________________________________________
 //
-bool DWM1000_Anchor::receiveFinalForAnchor() {
+  bool DWM1000_Anchor::receiveFinalForAnchor() {
 	uint32_t frame_len;
 	/* Clear good RX frame event and TX frame sent in the DW1000 status register. */
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
@@ -405,7 +405,7 @@ bool DWM1000_Anchor::receiveFinalForAnchor() {
 }
 //______________________________________________________________________
 //
-void DWM1000_Anchor::sendReply() {
+  void DWM1000_Anchor::sendReply() {
 
 	uint32 resp_tx_time;
 
@@ -425,14 +425,12 @@ void DWM1000_Anchor::sendReply() {
 	dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
 	dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
 	dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-
-	setReceiveTimeout(10);
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
 
 }
 //______________________________________________________________________
 //
-void DWM1000_Anchor::rxcallback(const dwt_callback_data_t * data) {
+  void DWM1000_Anchor::rxcallback(const dwt_callback_data_t * data) {
 	if (gAnchor) {
 		DWM1000_Anchor& anchor = *gAnchor;
 		anchor._interrupts++;

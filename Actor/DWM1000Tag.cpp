@@ -209,19 +209,6 @@ void DWM1000_Tag::init() {
 	initSpi();
 	enableIsr();
 
-	while (true) {
-		uint64_t eui = 0xF1F2F3F4F5F6F7F;
-		dwt_seteui((uint8_t*) &eui);
-		dwt_geteui((uint8_t*) &eui);
-		LOGF( "EUID : %ld", eui);
-//	ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F );
-		dwt_seteui((uint8_t*) &eui);
-		dwt_geteui((uint8_t*) &eui);
-		LOGF( "EUID : %ld", eui);
-		delay(2000);
-		if (eui == 0xF1F2F3F4F5F6F7F)
-			break;
-	}
 //	dwt_softreset();
 	deca_sleep(100);
 
@@ -245,8 +232,15 @@ void DWM1000_Tag::init() {
 	 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
 	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
 	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable interr
 	dwt_setcallbacks(txcallback, rxcallback); // set interr callbacks
+
+	uint64_t eui = 0xF1F2F3F4F5F6F7F;
+	dwt_seteui((uint8_t*) &eui);
+	dwt_geteui((uint8_t*) &eui);
+	LOGF( "EUID : %ld", eui);
+	ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F);
 
 	_count = 0;
 }
@@ -290,7 +284,7 @@ void DWM1000_Tag::publish() {
 void DWM1000_Tag::sendPoll() {
 	/* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
 	 * set by dwt_setrxaftertxdelay() has elapsed. */
-	dwt_setinterrupt(DWT_INT_TFRS, 0); // disabled , is 0
+//	dwt_setinterrupt(DWT_INT_TFRS, 1); // disabled , is 0
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
 	/* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
 	tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
@@ -363,45 +357,73 @@ bool DWM1000_Tag::receiveReplyForTag() {
 //
 void DWM1000_Tag::rxcallback(const dwt_callback_data_t * data) {
 	if (gTag) {
-		DWM1000_Tag& tag = *gTag;
-		tag._interrupts++;
-		switch (tag.state()) {
-		case S_REPLY_WAIT: {
-			tag._replyReceived++;
-			if (tag.receiveReplyForTag()) {
-				tag._replyForTag++;
-				tag.sendFinal();
-				tag._finalSend++;
-				tag.setReceiveTimeout(10);
-				tag.state(S_START);
-			}
-			break;
-		}
+		gTag->onRxCallback();
+	}
+}
 
+void DWM1000_Tag::onRxCallback() {
+	_interrupts++;
+	switch (state()) {
+	case S_REPLY_WAIT: {
+		_replyReceived++;
+		if (receiveReplyForTag()) {
+			_replyForTag++;
+			sendFinal();
+			_finalSend++;
+			setReceiveTimeout(10);
+			state(S_START);
 		}
-
+		break;
+	}
 	}
 }
 
 void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
-	if (hdr.is(_mqtt, REPLY(CONNECT))) {
-		LOGF("");
+	if (hdr.is(_mqtt, REPLY(CONNECT))) { // STATE independent message handling
 		_mqttConnected = true;
 		return;
 	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
-		LOGF("");
 		_mqttConnected = false;
 		return;
 	} else if (hdr.is(INIT)) {
 		init();
 		setReceiveTimeout(1000); // delay  between POLL
+		state(S_START);
+	}
 
-	};
-	switch (state()) {
+	switch (state()) { // STATE dependent message handling
 	case S_START: {
-		setReceiveTimeout(10); // delay  between POLL
-		state(S_REPLY_WAIT);
-		sendPoll();
+		if (hdr.is(TIMEOUT)) {
+
+			publish();
+			uint64_t end_time = millis() + 10;
+			uint32_t status_reg;
+
+            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+
+			dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+			sendPoll();
+			_pollsSend++;
+			while ((millis() < end_time)
+					&& ((status_reg & SYS_STATUS_RXFCG) == 0)) {
+				status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+			}
+
+			if (millis() >= end_time)
+				break;
+			_replyReceived++;
+			if (receiveReplyForTag()) {
+				_replyForTag++;
+				sendFinal();
+				_finalSend++;
+				state(S_START);
+			}
+
+
+			setReceiveTimeout(10); // delay  between POLL
+
+		}
 		break;
 	}
 	case S_REPLY_WAIT: {
@@ -414,63 +436,6 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 
 	}
 	return;
-	Json json(20);
-	static uint32_t polls = 0;
-	PT_BEGIN()
-
-	POLL_SEND: {
-		while (true) {
-			publish();
-			setReceiveTimeout(10); // delay  between POLL
-			PT_YIELD_UNTIL(hdr.is(TIMEOUT));
-			sendPoll();
-			_pollsSend++;
-			setReceiveTimeout(10);
-			PT_YIELD_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD));
-			if (hdr.is(TIMEOUT)) {
-				LOGF(" timeout poll reply ");
-				continue;
-			}
-			if (hdr.is(RXD))
-				goto RESP_RECEIVED;
-		}
-
-	}
-	RESP_RECEIVED: {
-
-		frame_seq_nb++; /* Increment frame sequence number after transmission of the poll message (modulo 256). */
-		uint32 frame_len;
-
-		/* Clear good RX frame event and TX frame sent in the DW1000 status register. */
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-		/* A frame has been received, read iCHANGEt into the local buffer. */
-		frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-		if (frame_len <= RX_BUF_LEN) {
-			dwt_readrxdata(rx_buffer, frame_len, 0);
-		}
-
-		/* Check that the frame is the expected response from the companion "DS TWR responder" example.
-		 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-		rx_buffer[ALL_MSG_SN_IDX] = 0;
-		if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) { // CHECK RESP MSG
-			_replyReceived++;
-			setReceiveTimeout(10);
-			sendFinal();
-			_finalSend++;
-			PT_YIELD_UNTIL(hdr.is(RXD) || hdr.is(TIMEOUT));
-			;
-			/* Clear TXFRS event. */
-//			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-			/* Increment frame sequence number after transmission of the final message (modulo 256). */
-			frame_seq_nb++;
-		} else {
-			LOGF(" not expected response ");
-		}
-	}
-	goto POLL_SEND;
-
-PT_END();
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -484,15 +449,15 @@ PT_END();
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 get_tx_timestamp_u64(void) {
-uint8 ts_tab[5];
-uint64 ts = 0;
-int i;
-dwt_readtxtimestamp(ts_tab);
-for (i = 4; i >= 0; i--) {
-	ts <<= 8;
-	ts |= ts_tab[i];
-}
-return ts;
+	uint8 ts_tab[5];
+	uint64 ts = 0;
+	int i;
+	dwt_readtxtimestamp(ts_tab);
+	for (i = 4; i >= 0; i--) {
+		ts <<= 8;
+		ts |= ts_tab[i];
+	}
+	return ts;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -506,15 +471,15 @@ return ts;
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 get_rx_timestamp_u64(void) {
-uint8 ts_tab[5];
-uint64 ts = 0;
-int i;
-dwt_readrxtimestamp(ts_tab);
-for (i = 4; i >= 0; i--) {
-	ts <<= 8;
-	ts |= ts_tab[i];
-}
-return ts;
+	uint8 ts_tab[5];
+	uint64 ts = 0;
+	int i;
+	dwt_readrxtimestamp(ts_tab);
+	for (i = 4; i >= 0; i--) {
+		ts <<= 8;
+		ts |= ts_tab[i];
+	}
+	return ts;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -529,11 +494,11 @@ return ts;
  * @return none
  */
 void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
-int i;
-*ts = 0;
-for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-	*ts += ts_field[i] << (i * 8);
-}
+	int i;
+	*ts = 0;
+	for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+		*ts += ts_field[i] << (i * 8);
+	}
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -548,11 +513,11 @@ for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
  * @return none
  */
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts) {
-int i;
-for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-	ts_field[i] = (uint8) ts;
-	ts >>= 8;
-}
+	int i;
+	for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+		ts_field[i] = (uint8) ts;
+		ts >>= 8;
+	}
 }
 
 /*****************************************************************************************************************************************************

@@ -52,6 +52,7 @@ public:
 	void clearInterrupt();
 	void publish();
 	bool receiveReplyForTag();
+	void onRxCallback();
 };
 
 #endif /* DWM1000TAG_H_ */

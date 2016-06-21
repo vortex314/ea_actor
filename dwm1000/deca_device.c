@@ -2212,7 +2212,7 @@ uint8 dwt_checkIRQ(void)
  *
  * no return value
  */
-void dwt_isr(void) // Assume interrupt can supply context
+ void dwt_isr(void) // Assume interrupt can supply context
 {
     uint32  status = 0;
     uint32  clear = 0; // Will clear any events seen
