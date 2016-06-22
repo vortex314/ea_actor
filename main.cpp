@@ -37,10 +37,14 @@ extern "C" void setup(void) {
 	config = Config::create();
 
 #ifdef TAG
-	mqtt = Mqtt::create(mqttFramer,"tag_1/");
+#define MQTT_NAME "tag_1"
+#else
+#define MQTT_NAME "anchor_1"
+#endif
+	mqtt = Mqtt::create(mqttFramer,MQTT_NAME);
+#ifdef TAG
 	dwm1000 = DWM1000_Tag::create(mqtt);
 #else
-	mqtt = Mqtt::create(mqttFramer,"anchor_1/");
 	dwm1000 = DWM1000_Anchor::create(mqtt);
 #endif
 	System::create(mqtt);

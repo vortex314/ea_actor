@@ -30,7 +30,8 @@ class DWM1000_Anchor: public Actor {
 	uint32_t _replySend;
 	uint32_t _finalReceived;
 	uint32_t _finalForAnchor;
-	uint32_t _interrupts;
+	volatile uint32_t _interrupts;
+	volatile bool _interrupted;
 	enum State {
 		S_START,S_POLL_WAIT,S_REPLY_SEND,S_FINAL_WAIT,S_FINAL_SEND
 	};

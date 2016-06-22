@@ -30,6 +30,7 @@ class DWM1000_Tag: public Actor {
 	enum State {
 		S_START,S_REPLY_WAIT
 	};
+	volatile bool _interrupted;
 public:
 	DWM1000_Tag(ActorRef mqtt);
 	static ActorRef create(ActorRef mqtt);

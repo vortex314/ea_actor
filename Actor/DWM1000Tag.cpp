@@ -137,31 +137,27 @@ void DWM1000_Tag::resetChip() {
 }
 //_________________________________________________ IRQ handler
 //
-bool DWM1000_Tag::interrupt_detected = false;
+ICACHE_RAM_ATTR void DWM1000_Tag::my_dwt_isr() {
+	if (gTag) {
+		gTag->_interrupted = true;
+		gTag->_interrupts++;
+	}
+}
 
-/*
- ICACHE_RAM_ATTR void DWM1000_Tag::my_dwt_isr() {
- interrupt_detected = true;
- gTag->_status_reg = dwt_read32bitreg(SYS_STATUS_ID);
- dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR | SYS_STATUS_RXFCG);
- interruptCount++;
- }
+bool DWM1000_Tag::isInterruptDetected() {
+	return _interrupted;
+}
 
- bool DWM1000_Tag::isInterruptDetected() {
- return interrupt_detected;
- }
-
- void DWM1000_Tag::clearInterrupt() {
- interrupt_detected = false;
- }
- */
+void DWM1000_Tag::clearInterrupt() {
+	_interrupted = false;
+}
 //_________________________________________________ Configure IRQ pin
 //
 void DWM1000_Tag::enableIsr() {
 	LOGF( " IRQ SET ");
 	int pin = D2; // IRQ PIN = D2 = GPIO4
 	pinMode(pin, 0); // INPUT
-	attachInterrupt(pin, dwt_isr, CHANGE); // was CHANGE
+	attachInterrupt(pin, my_dwt_isr, CHANGE); // was CHANGE
 }
 //_________________________________________________ INITIALIZE SPI
 //

@@ -38,6 +38,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1339498969" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -64,6 +65,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1109015738" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -96,6 +98,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1461950491" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -149,6 +152,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.897308332" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -176,6 +180,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.58934968" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__ARDUINO__"/>
@@ -209,6 +214,7 @@
 									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/tools/xtensa-lx106-elf/lib/gcc/xtensa-lx106-elf/4.8.2/include/"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/driver}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ea_actor/dwm1000}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/lieven/workspace/Arduino/libraries/SPI"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.737304301" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>

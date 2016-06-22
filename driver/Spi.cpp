@@ -501,8 +501,6 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
  extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
 		const uint8 *buffer) {
 
-//	LOGF("head : %s", bytesToHex(hbuff, hLen));
-//	LOGF("data : %s", bytesToHex(buffer, bLen));
 	uint32_t i;
 	Spi spi(HSPI);
 	spi.set_hw_cs(false);
@@ -511,7 +509,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 		spi.transaction( 8, hbuff[i], 0, 0, 0, 0, 0, 0);
 	for (i = 0; i < bLen; i++)
 		spi.transaction( 8, buffer[i], 0, 0, 0, 0, 0, 0);
-	ets_delay_us(1000);
+	ets_delay_us(100);
 	spi.cs_deselect();
 	return 0;
 }
@@ -531,7 +529,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 		spi.transaction( 0, 0, 0, 0, 8, hbuff[i], 0, 0);
 	for (i = 0; i < bLen; i++)
 		buffer[i] = spi.transaction( 0, 0, 0, 0, 0, 0, 8, 0);
-	ets_delay_us(1000);
+	ets_delay_us(10);
 	spi.cs_deselect();
 //	LOGF("data : %s", bytesToHex(buffer, bLen));
 	return 0;

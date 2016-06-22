@@ -32,6 +32,7 @@ LIBS ?= $(ESP_LIBS)/Wire \
         ../Common/src \
         ../Common/inc \
         ./driver \
+       $(ESP_LIBS)/SPI \
         ./dwm1000
 #       $(ESP_LIBS)/ESP8266WiFi \
 #       $(ESP_LIBS)/ESP8266mDNS \
@@ -186,7 +187,7 @@ symbols : $(MAIN_ELF)
 	
 flash: $(MAIN_EXE)
 	$(RESET) $(UPLOAD_PORT)
-	$(ESPTOOL) --port $(UPLOAD_PORT)  read_mac
+	$(ESPTOOL) --port $(UPLOAD_PORT) -b 115200 read_mac
 	$(ESPTOOL) --port $(UPLOAD_PORT)  read_flash  0x3F8000 0x100 dump.bin 
 	od --endian=little -X -c dump.bin > $(LOG)
 #	$(ESPTOOL) --port $(UPLOAD_PORT)  erase_flash

@@ -169,31 +169,29 @@ void DWM1000_Anchor::resetChip() {
 }
 //_________________________________________________ IRQ handler
 //
-//bool DWM1000_Anchor::interrupt_detected = false;
-// uint32_t DWM1000_Anchor::_status_reg = 0;
-/*
- ICACHE_RAM_ATTR void DWM1000_Anchor::my_dwt_isr() {
- interrupt_detected = true;
- _status_reg = dwt_read32bitreg(SYS_STATUS_ID);
- dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR | SYS_STATUS_RXFCG);
- interruptCount++;
- }
 
- bool DWM1000_Anchor::isInterruptDetected() {
- return interrupt_detected;
- }
+ICACHE_RAM_ATTR void DWM1000_Anchor::my_dwt_isr() {
+	if (gAnchor) {
+		gAnchor->_interrupted = true;
+		gAnchor->_interrupts++;
+	}
+}
 
- void DWM1000_Anchor::clearInterrupt() {
- interrupt_detected = false;
- }
- */
+bool DWM1000_Anchor::isInterruptDetected() {
+	return _interrupted;
+}
+
+void DWM1000_Anchor::clearInterrupt() {
+	_interrupted = false;
+}
+
 //_________________________________________________ Configure IRQ pin
 //
 void DWM1000_Anchor::enableIsr() {
 	LOGF( " IRQ SET ");
 	int pin = D2; // IRQ PIN = D2 = GPIO4
 	pinMode(pin, 0); // INPUT
-	attachInterrupt(pin, dwt_isr, CHANGE);
+	attachInterrupt(pin, my_dwt_isr, CHANGE);
 }
 //_________________________________________________ INITIALIZE SPI
 //
@@ -202,7 +200,7 @@ void DWM1000_Anchor::initSpi() {
 	Spi spi(HSPI);
 	spi.init();
 	spi.mode(0, 0);
-	//	spi.clock(HSPI, SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
+//	spi.clock(HSPI, SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
 	spi.clock(10, 20); //
 //	spi.tx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
 //	spi.rx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
@@ -232,6 +230,9 @@ void DWM1000_Anchor::init() {
 	LOGF("HSPI");
 //_________________________________________________INIT SPI ESP8266
 
+
+
+
 	resetChip();
 	LOGF(" IRQ pin : %d ", digitalRead(D2));
 	initSpi();
@@ -242,10 +243,10 @@ void DWM1000_Anchor::init() {
 		dwt_seteui((uint8_t*) &eui);
 		dwt_geteui((uint8_t*) &eui);
 		LOGF( "EUID : %ld", eui);
-//	ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F );
+		ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F);
 		dwt_seteui((uint8_t*) &eui);
 		dwt_geteui((uint8_t*) &eui);
-		LOGF( "EUID : %ld", eui);
+		LOGF( "EUID : %lX", eui);
 		delay(2000);
 		if (eui == 0xF1F2F3F4F5F6F7F)
 			break;
@@ -274,13 +275,9 @@ void DWM1000_Anchor::init() {
 	dwt_setrxantennadelay(RX_ANT_DLY);
 	dwt_settxantennadelay(TX_ANT_DLY);
 
-	/* Set expected response's delay and timeout. See NOTE 4 and 5 below.
-	 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
 //	dwt_initialise(DWT_LOADUCODE);
-	// Configure the callbacks from the dwt library
+// Configure the callbacks from the dwt library
 	dwt_setinterrupt(DWT_INT_RFCG, 1); // enable interr
 	dwt_setcallbacks(txcallback, rxcallback); // set interr callbacks
 
@@ -328,8 +325,7 @@ void DWM1000_Anchor::publish() {
 	}
 }
 
-
- void DWM1000_Anchor::calcDistance() {
+void DWM1000_Anchor::calcDistance() {
 	_finalReceived++;
 	uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
 	uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
@@ -361,7 +357,7 @@ void DWM1000_Anchor::publish() {
 }
 //______________________________________________________________________
 //
-  bool DWM1000_Anchor::receivePollForAnchor() {
+bool DWM1000_Anchor::receivePollForAnchor() {
 	uint32 frame_len;
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
 	/* Clear good RX frame event in the DW1000 status register. */
@@ -381,7 +377,7 @@ void DWM1000_Anchor::publish() {
 }
 //______________________________________________________________________
 //
-  bool DWM1000_Anchor::receiveFinalForAnchor() {
+bool DWM1000_Anchor::receiveFinalForAnchor() {
 	uint32_t frame_len;
 	/* Clear good RX frame event and TX frame sent in the DW1000 status register. */
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
@@ -405,7 +401,7 @@ void DWM1000_Anchor::publish() {
 }
 //______________________________________________________________________
 //
-  void DWM1000_Anchor::sendReply() {
+void DWM1000_Anchor::sendReply() {
 
 	uint32 resp_tx_time;
 
@@ -430,7 +426,7 @@ void DWM1000_Anchor::publish() {
 }
 //______________________________________________________________________
 //
-  void DWM1000_Anchor::rxcallback(const dwt_callback_data_t * data) {
+void DWM1000_Anchor::rxcallback(const dwt_callback_data_t * data) {
 	if (gAnchor) {
 		DWM1000_Anchor& anchor = *gAnchor;
 		anchor._interrupts++;
@@ -476,6 +472,42 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 		setReceiveTimeout(1000);
 		return;
 	};
+	LOGF("");
+	uint64_t end_time = millis() + 10;
+	publish();
+	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO);
+	// clear timeout
+	dwt_setrxtimeout(0); /* Clear reception timeout to start next ranging process. */
+	dwt_rxenable(0); /* Activate reception immediately. */
+	clearInterrupt();
+	while (end_time > millis()) {
+		if (isInterruptDetected()) {
+			_pollsReceived++;
+			if (receivePollForAnchor()) {
+				_pollsForAnchor++;
+				sendReply();
+				_replySend++;
+				break;
+			}
+
+		}
+	};
+	if (isInterruptDetected()) {
+		clearInterrupt();
+		while (end_time > millis()) {
+			if (isInterruptDetected()) {
+				_finalReceived++;
+				if (receiveFinalForAnchor()) {
+					_finalForAnchor++;
+					calcDistance();
+				}
+			}
+
+		}
+	}
+	setReceiveTimeout(1);
+	return;
+
 	switch (state()) {
 	case S_START: {
 		publish();
