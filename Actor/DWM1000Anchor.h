@@ -41,7 +41,7 @@ public:
 	virtual ~DWM1000_Anchor();
 	void mode(uint32_t m);
 	void init();
-	void resetChip();
+	static void resetChip();
 	void initSpi();
 	void enableIsr();
 	static bool interrupt_detected ;

@@ -52,10 +52,13 @@ extern "C" {
 #define SPI_CLK_FREQ CPU_CLK_FREQ/(SPI_CLK_PREDIV*SPI_CLK_CNTDIV) // 80 / 20 = 4 MHz
 class Spi {
 	uint8_t _spi_no;
+	bool _duplex;
+	uint8_t _mode;
 public:
 
 	Spi(uint8 no);
 	void init();
+	void dwmInit();
 	void mode( uint8 cpha, uint8 cpol);
 	void init_gpio( uint8 sysclk_as_spiclk);
 	void clock( uint16 prediv, uint8 cntdiv);
@@ -65,6 +68,7 @@ public:
 			uint32 addr_bits, uint32 addr_data, uint32 dout_bits,
 			uint32 dout_data, uint32 din_bits, uint32 dummy_bits);
 	void set_bit_order(int order);
+	void txf(uint8_t* output,uint8_t outputLength,uint8_t* input,uint8_t inputLength) ;
 
 	void set_hw_cs(bool use);
 	void cs_select();

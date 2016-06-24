@@ -44,7 +44,8 @@ extern "C" void setup(void) {
 	mqtt = Mqtt::create(mqttFramer,MQTT_NAME);
 #ifdef TAG
 	dwm1000 = DWM1000_Tag::create(mqtt);
-#else
+#endif
+#ifdef ANCHOR1
 	dwm1000 = DWM1000_Anchor::create(mqtt);
 #endif
 	System::create(mqtt);

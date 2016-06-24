@@ -37,13 +37,163 @@
 Spi::Spi(uint8 spi_no) {
 	_spi_no = spi_no;
 	ASSERT_LOG(_spi_no <= 1)
+	_mode = 0;
+	_duplex = false;
+}
 
+uint32_t add(uint32_t value, uint32_t mask, uint32_t shift) {
+	ASSERT_LOG(shift < 32);
+	return (value & mask) << shift;
+}
 
+#define SET(reg,mask,value) *(volatile uint32_t *)reg =  (*(uint32_t*)reg  & (~ (mask <<mask ## _S))) | (( value & mask ) << mask ## _S)
+#define CLEAR(reg) *(volatile uint32_t *)reg=0
+#define SET_BIT(reg , bit) *(volatile uint32_t *)reg |= bit
+#define CLR_BIT(re,bit) *(volatile uint32_t *)reg &= ~(bit)
+#define ADD(mask,value) (( value & mask ) << mask ## _S)
+
+void Spi::dwmInit() { // POL/PHA
+	WRITE_PERI_REG(PERIPHS_IO_MUX, 0x105);
+	//Set bit 9 if 80MHz sysclock required
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDI_U, 2);
+	//GPIO12 is HSPI MISO pin (Master Data In)
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, 2);
+	//GPIO13 is HSPI MOSI pin (Master Data Out)
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTMS_U, 2);
+	//GPIO14 is HSPI CLK pin (Clock)
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
+	//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
+	uint32_t reg = 0;
+	//----------------------------------------------------- SPI_CTRL2
+	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_MODE, 2);
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_NUM, 0);
+	// delay before MISO
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_MODE, 0);
+	//
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_NUM, 0);
+	// delay before MISO
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_MODE, 0);
+	// sys or spi ticks
+	if (_mode & 0x01) {
+		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, SPI_CK_OUT_HIGH_MODE);
+		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_LOW_MODE, 0);
+	} else {
+		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_LOW_MODE, SPI_CK_OUT_LOW_MODE);
+		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, 0);
+	};
+	SET(SPI_CTRL2(HSPI), SPI_HOLD_TIME, SPI_HOLD_TIME);
+	SET(SPI_CTRL2(HSPI), SPI_SETUP_TIME, SPI_SETUP_TIME);
+
+	//------------------------------------------------------ SPI_CLOCK
+
+	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 4);
+	// divide by 5 ( N+1 )
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 15);
+	// count to 16
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 14);
+	// 14-7 is high ticks
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 7);
+	// http://d.av.id.au/blog/hardware-spi-clock-registers/
+
+	//------------------------------------------------------ SPI_CTRL
+
+	CLEAR(SPI_CTRL(HSPI));
+	SET_BIT(SPI_CTRL(HSPI), SPI_WR_BIT_ORDER);
+	// MSB first in write
+	SET_BIT(SPI_CTRL(HSPI), SPI_RD_BIT_ORDER);
+	// MSB first in read
+
+	//------------------------------------------------------ SPI_USER
+
+	CLEAR(SPI_USER(HSPI));
+	SET_BIT(SPI_USER(HSPI), SPI_WR_BYTE_ORDER);
+	// send from high byte to low
+	SET_BIT(SPI_USER(HSPI), SPI_RD_BYTE_ORDER);
+	// recv from high byte to low in 32 bit
+	if (_mode == 1 || _mode == 2) { // falling edge
+		CLR_BIT(SPI_USER(HSPI), SPI_CK_OUT_EDGE);
+		// SPI Phase 1 OUT for pol=1 ( falling edge )
+		CLR_BIT(SPI_USER(HSPI), SPI_CK_I_EDGE);
+		// SPI Phase 1 in for pol==1 , mode 1 or 3
+	} else { // mode 0 or 3  rising edge
+		SET_BIT(SPI_USER(HSPI), SPI_CK_OUT_EDGE);
+		// SPI Phase 0 OUT for pol=0 ( rising edge )
+		SET_BIT(SPI_USER(HSPI), SPI_CK_I_EDGE);
+		// SPI Phase 0 in for pol==0 , mode 0 or 2
+	}
+
+	if (_duplex)
+		SET_BIT(SPI_USER(HSPI), SPI_DOUTDIN);
+	// set full duplex
+
+	//------------------------------------------------------ SPI_USER1
+
+	SET(SPI_USER1(HSPI), SPI_USR_ADDR_BITLEN, 0);
+	SET(SPI_USER1(HSPI), SPI_USR_DUMMY_CYCLELEN, 0);
+
+	//------------------------------------------------------ SPI_USER2
+
+	SET(SPI_USER2(HSPI), SPI_USR_COMMAND_BITLEN, 0);
+	SET(SPI_USER2(HSPI), SPI_USR_COMMAND_VALUE, 0);
+
+	if (_mode & 2) { // CPOL
+		SET_PERI_REG_MASK(SPI_CTRL2(_spi_no),
+				SPI_CK_OUT_HIGH_MODE << SPI_CK_OUT_HIGH_MODE_S);
+		CLEAR_PERI_REG_MASK(SPI_CTRL2(_spi_no),
+				SPI_CK_OUT_LOW_MODE << SPI_CK_OUT_LOW_MODE_S);
+	} else {
+		SET_PERI_REG_MASK(SPI_CTRL2(_spi_no),
+				SPI_CK_OUT_LOW_MODE << SPI_CK_OUT_LOW_MODE_S);
+		CLEAR_PERI_REG_MASK(SPI_CTRL2(_spi_no),
+				SPI_CK_OUT_HIGH_MODE << SPI_CK_OUT_LOW_MODE_S);
+	}
+}
+
+void Spi::txf(uint8_t* output, uint8_t outputLength, uint8_t* input,
+		uint8_t inputLength) {
+	if (outputLength)
+		SET_BIT(SPI_USER(HSPI), SPI_USR_MOSI);
+	if (inputLength)
+		SET_BIT(SPI_USER(HSPI), SPI_USR_MISO);
+	SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, outputLength*8);
+	SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, inputLength*8);
+	// txf data to buffers
+    volatile uint32_t * fifoPtr = &SPI1W0;
+    uint8_t dataSize = ((outputLength + 3) / 4);
+
+    if(outputLength) {
+        uint32_t * dataPtr = (uint32_t*) output;
+        while(dataSize--) {
+            *fifoPtr = *dataPtr;
+            dataPtr++;
+            fifoPtr++;
+        }
+    } else {
+        // no out data only read fill with dummy data!
+        while(dataSize--) {
+            *fifoPtr = 0xFFFFFFFF;
+            fifoPtr++;
+        }
+    }
+
+    SET_BIT(SPI_CMD(HSPI), SPI_USR);
+	// txf data from buffers
+	while (READ_PERI_REG(SPI_CMD(HSPI)) & SPI_USR)
+		// wait ready
+		;
+    if(inputLength) {
+        volatile uint8_t * fifoPtr8 = (volatile uint8_t *) &SPI1W0;
+        dataSize = inputLength;
+        while(dataSize--) {
+            *input = *fifoPtr8;
+            input++;
+            fifoPtr8++;
+        }
+    }
 
 }
 
-
-void Spi::init(){
+void Spi::init() {
 	init_gpio(SPI_CLK_USE_DIV);
 	clock(SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
 	tx_byte_order(SPI_BYTE_ORDER_HIGH_TO_LOW);
@@ -51,6 +201,7 @@ void Spi::init(){
 
 	SET_PERI_REG_MASK(SPI_USER(_spi_no), SPI_CS_SETUP|SPI_CS_HOLD);
 	CLEAR_PERI_REG_MASK(SPI_USER(_spi_no), SPI_FLASH_MODE);
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,6 +292,7 @@ void Spi::init_gpio(uint8 sysclk_as_spiclk) {
 		//GPIO14 is HSPI CLK pin (Clock)
 		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 		//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
+
 	}
 
 }
@@ -280,9 +432,9 @@ void Spi::rx_byte_order(uint8 byte_order) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-ICACHE_RAM_ATTR uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data, uint32 addr_bits,
-		uint32 addr_data, uint32 dout_bits, uint32 dout_data, uint32 din_bits,
-		uint32 dummy_bits) {
+ICACHE_RAM_ATTR uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data,
+		uint32 addr_bits, uint32 addr_data, uint32 dout_bits, uint32 dout_data,
+		uint32 din_bits, uint32 dummy_bits) {
 
 	ASSERT_LOG(_spi_no <= 1)
 
@@ -498,17 +650,17 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
- extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
-		const uint8 *buffer) {
+extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff,
+		uint32 bLen, const uint8 *buffer) {
 
 	uint32_t i;
 	Spi spi(HSPI);
 	spi.set_hw_cs(false);
 	spi.cs_select();
 	for (i = 0; i < hLen; i++)
-		spi.transaction( 8, hbuff[i], 0, 0, 0, 0, 0, 0);
+		spi.transaction(8, hbuff[i], 0, 0, 0, 0, 0, 0);
 	for (i = 0; i < bLen; i++)
-		spi.transaction( 8, buffer[i], 0, 0, 0, 0, 0, 0);
+		spi.transaction(8, buffer[i], 0, 0, 0, 0, 0, 0);
 	ets_delay_us(100);
 	spi.cs_deselect();
 	return 0;
@@ -519,16 +671,17 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 //
 /////////////////////////////////////////////////////////////////////////////////
 
- extern "C" int ICACHE_RAM_ATTR readfromspi(uint16 hLen, const uint8 *hbuff, uint32 bLen, uint8 *buffer) {
+extern "C" int ICACHE_RAM_ATTR readfromspi(uint16 hLen, const uint8 *hbuff,
+		uint32 bLen, uint8 *buffer) {
 	uint32_t i;
 //	LOGF("head : %s", bytesToHex(hbuff, hLen));
 	Spi spi(1);
 	spi.set_hw_cs(false);
 	spi.cs_select();
 	for (i = 0; i < hLen; i++)
-		spi.transaction( 0, 0, 0, 0, 8, hbuff[i], 0, 0);
+		spi.transaction(0, 0, 0, 0, 8, hbuff[i], 0, 0);
 	for (i = 0; i < bLen; i++)
-		buffer[i] = spi.transaction( 0, 0, 0, 0, 0, 0, 8, 0);
+		buffer[i] = spi.transaction(0, 0, 0, 0, 0, 0, 8, 0);
 	ets_delay_us(10);
 	spi.cs_deselect();
 //	LOGF("data : %s", bytesToHex(buffer, bLen));
@@ -540,7 +693,7 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 //
 /////////////////////////////////////////////////////////////////////////////////
 void Spi::set_rate_low() {
-	clock( SPI_CLK_PREDIV, 20);
+	clock(SPI_CLK_PREDIV, 20);
 }
 //////////////////////////////////////////////////////////////////////////////////
 //
@@ -548,7 +701,7 @@ void Spi::set_rate_low() {
 //
 /////////////////////////////////////////////////////////////////////////////////
 void Spi::set_rate_high() {
-	clock( SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
+	clock(SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
 }
 
 /*//////////////////////////////////////////////////////////////////////////////*/
