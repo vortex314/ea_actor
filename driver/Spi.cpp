@@ -34,11 +34,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+Spi* Spi::gSpi1 = new Spi(HSPI);
+
 Spi::Spi(uint8 spi_no) {
 	_spi_no = spi_no;
 	ASSERT_LOG(_spi_no <= 1)
 	_mode = 0;
-	_duplex = false;
+	_duplex = true;
+	_highestBitFirst = true;
+	_highestByteFirst = false;
 }
 
 uint32_t add(uint32_t value, uint32_t mask, uint32_t shift) {
@@ -46,11 +50,33 @@ uint32_t add(uint32_t value, uint32_t mask, uint32_t shift) {
 	return (value & mask) << shift;
 }
 
-#define SET(reg,mask,value) *(volatile uint32_t *)reg =  (*(uint32_t*)reg  & (~ (mask <<mask ## _S))) | (( value & mask ) << mask ## _S)
+#define SET(reg,mask,value) *(volatile uint32_t *)reg =  (*(uint32_t*)(reg) & (~(mask << mask ## _S))) | (( (value) & mask ) << mask ## _S)
 #define CLEAR(reg) *(volatile uint32_t *)reg=0
-#define SET_BIT(reg , bit) *(volatile uint32_t *)reg |= bit
-#define CLR_BIT(re,bit) *(volatile uint32_t *)reg &= ~(bit)
+#define SET_BIT(reg , bit) *(volatile uint32_t *)reg = (*(volatile uint32_t *)reg) | (bit)
+#define CLR_BIT(reg,bit) *(volatile uint32_t *)reg = (*(volatile uint32_t *)reg) & ~(bit)
 #define ADD(mask,value) (( value & mask ) << mask ## _S)
+
+void Spi::dwmReset() {
+	int pin = 5; // RESET PIN == D1 == GPIO5
+	pinMode(pin, 1); // OUTPUT
+	delay(10);
+	digitalWrite(pin, 0); // PULL LOW
+	delay(10); // 10ms
+	digitalWrite(pin, 1); // PUT HIGH
+}
+
+void Spi::dwmFullSpeed() { // 20 MHz max, 10 Mhz
+	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 0);
+	//
+	// divide by 1 ( N+1 )
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 7);
+	// 3F max ==
+	// count to 16
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 4);
+	// 14-7 is high ticks
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 0);
+
+}
 
 void Spi::dwmInit() { // POL/PHA
 	WRITE_PERI_REG(PERIPHS_IO_MUX, 0x105);
@@ -61,55 +87,38 @@ void Spi::dwmInit() { // POL/PHA
 	//GPIO13 is HSPI MOSI pin (Master Data Out)
 	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTMS_U, 2);
 	//GPIO14 is HSPI CLK pin (Clock)
+//    pinMode(SS, OUTPUT); ///< GPIO15
 	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 	//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
-	uint32_t reg = 0;
-	//----------------------------------------------------- SPI_CTRL2
-	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_MODE, 2);
-	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_NUM, 0);
-	// delay before MISO
-	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_MODE, 0);
-	//
-	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_NUM, 0);
-	// delay before MISO
-	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_MODE, 0);
-	// sys or spi ticks
-	if (_mode & 0x01) {
-		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, SPI_CK_OUT_HIGH_MODE);
-		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_LOW_MODE, 0);
-	} else {
-		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_LOW_MODE, SPI_CK_OUT_LOW_MODE);
-		SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, 0);
-	};
-	SET(SPI_CTRL2(HSPI), SPI_HOLD_TIME, SPI_HOLD_TIME);
-	SET(SPI_CTRL2(HSPI), SPI_SETUP_TIME, SPI_SETUP_TIME);
+//	uint32_t reg = 0;
 
 	//------------------------------------------------------ SPI_CLOCK
 
+	CLEAR(SPI_CLOCK(HSPI));
 	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 4);
+	// was 4
 	// divide by 5 ( N+1 )
 	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 15);
+	// 3F max ==
 	// count to 16
-	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 14);
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 8);
 	// 14-7 is high ticks
-	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 7);
-	// http://d.av.id.au/blog/hardware-spi-clock-registers/
-
-	//------------------------------------------------------ SPI_CTRL
-
-	CLEAR(SPI_CTRL(HSPI));
-	SET_BIT(SPI_CTRL(HSPI), SPI_WR_BIT_ORDER);
-	// MSB first in write
-	SET_BIT(SPI_CTRL(HSPI), SPI_RD_BIT_ORDER);
-	// MSB first in read
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 0);
+	// http://d.av.id.au/blog/hardware-spi-clock-registers should give 1MHz
 
 	//------------------------------------------------------ SPI_USER
 
 	CLEAR(SPI_USER(HSPI));
-	SET_BIT(SPI_USER(HSPI), SPI_WR_BYTE_ORDER);
-	// send from high byte to low
-	SET_BIT(SPI_USER(HSPI), SPI_RD_BYTE_ORDER);
-	// recv from high byte to low in 32 bit
+	SET_BIT(SPI_USER(HSPI), SPI_CS_SETUP);
+	// use hardware CS
+	SET_BIT(SPI_USER(HSPI), SPI_CS_HOLD);
+	if (_highestByteFirst) {
+		SET_BIT(SPI_USER(HSPI), SPI_WR_BYTE_ORDER);
+		// send from high byte to low
+		SET_BIT(SPI_USER(HSPI), SPI_RD_BYTE_ORDER);
+		// recv from high byte to low in 32 bit
+
+	}
 	if (_mode == 1 || _mode == 2) { // falling edge
 		CLR_BIT(SPI_USER(HSPI), SPI_CK_OUT_EDGE);
 		// SPI Phase 1 OUT for pol=1 ( falling edge )
@@ -128,68 +137,131 @@ void Spi::dwmInit() { // POL/PHA
 
 	//------------------------------------------------------ SPI_USER1
 
+	CLEAR(SPI_USER1(HSPI));
 	SET(SPI_USER1(HSPI), SPI_USR_ADDR_BITLEN, 0);
 	SET(SPI_USER1(HSPI), SPI_USR_DUMMY_CYCLELEN, 0);
 
 	//------------------------------------------------------ SPI_USER2
 
+	CLEAR(SPI_USER2(HSPI));
 	SET(SPI_USER2(HSPI), SPI_USR_COMMAND_BITLEN, 0);
 	SET(SPI_USER2(HSPI), SPI_USR_COMMAND_VALUE, 0);
+	//------------------------------------------------------ SPI_CTRL
 
-	if (_mode & 2) { // CPOL
-		SET_PERI_REG_MASK(SPI_CTRL2(_spi_no),
-				SPI_CK_OUT_HIGH_MODE << SPI_CK_OUT_HIGH_MODE_S);
-		CLEAR_PERI_REG_MASK(SPI_CTRL2(_spi_no),
-				SPI_CK_OUT_LOW_MODE << SPI_CK_OUT_LOW_MODE_S);
+	CLEAR(SPI_CTRL(HSPI));
+	if (_highestBitFirst) {
+		CLR_BIT(SPI_CTRL(HSPI), SPI_RD_BIT_ORDER);
+		CLR_BIT(SPI_CTRL(HSPI), SPI_WR_BIT_ORDER);
 	} else {
-		SET_PERI_REG_MASK(SPI_CTRL2(_spi_no),
-				SPI_CK_OUT_LOW_MODE << SPI_CK_OUT_LOW_MODE_S);
-		CLEAR_PERI_REG_MASK(SPI_CTRL2(_spi_no),
-				SPI_CK_OUT_HIGH_MODE << SPI_CK_OUT_LOW_MODE_S);
+		SET_BIT(SPI_CTRL(HSPI), SPI_WR_BIT_ORDER);
+		// MSB first in write
+		SET_BIT(SPI_CTRL(HSPI), SPI_RD_BIT_ORDER);
+		// MSB first in read
 	}
+
+	//------------------------------------------------------ SPI_CTRL1
+	CLEAR(SPI_CTRL1(HSPI));
+
+	//----------------------------------------------------- SPI_CTRL2
+	CLEAR(SPI_CTRL2(HSPI));
+	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_NUM, 0);
+	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_MODE, 1);
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_NUM, 0);
+	// delay before MISO
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_MODE, 1);
+	//
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_NUM, 0);
+	// delay before MISO
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_MODE, 1);
+	// sys or spi ticks
+
+	SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, SPI_CK_OUT_HIGH_MODE);
+	SET(SPI_CTRL2(HSPI), SPI_CK_OUT_LOW_MODE, SPI_CK_OUT_LOW_MODE);
+
+//	LOGF(" SPI_CTRL2 : %X ", *(volatile uint32_t *)(SPI_CTRL2(HSPI)));
+	SET(SPI_CTRL2(HSPI), SPI_HOLD_TIME, SPI_HOLD_TIME);
+	// set max hold time
+	SET(SPI_CTRL2(HSPI), SPI_SETUP_TIME, SPI_SETUP_TIME);
+	// set max setup time
+//	LOGF(" SPI_CTRL2 : %X ",*(volatile uint32_t*)SPI_CTRL2(HSPI));
+
+	/*	WRITE_PERI_REG(SPI_CTRL2(HSPI),
+	 (( 0xF & SPI_CS_DELAY_NUM ) << SPI_CS_DELAY_NUM_S) | //
+	 (( 0x1 & SPI_CS_DELAY_MODE) << SPI_CS_DELAY_MODE_S) |//
+	 (( 0xF & SPI_SETUP_TIME )<< SPI_SETUP_TIME_S ) |//
+	 (( 0xF & SPI_HOLD_TIME )<< SPI_HOLD_TIME_S ) |//
+	 (( 0xF & SPI_CK_OUT_LOW_MODE )<< SPI_CK_OUT_LOW_MODE_S ) |//
+	 (( 0xF & SPI_CK_OUT_HIGH_MODE )<< SPI_CK_OUT_HIGH_MODE_S ) |//
+	 (( 0x7 & SPI_MOSI_DELAY_NUM ) << SPI_MOSI_DELAY_NUM_S) |//
+	 (( 0x7 & SPI_MISO_DELAY_NUM ) << SPI_MISO_DELAY_NUM_S) |//
+	 (( 0x1 & SPI_MOSI_DELAY_MODE )<< SPI_MOSI_DELAY_MODE_S ) |//
+	 (( 0x1 & SPI_MISO_DELAY_MODE )<< SPI_MISO_DELAY_MODE_S ) |//
+	 0);*/
+//		LOGF(" SPI_CTRL2 : %X ",*(volatile uint32_t*)SPI_CTRL2(HSPI));
 }
 
 void Spi::txf(uint8_t* output, uint8_t outputLength, uint8_t* input,
 		uint8_t inputLength) {
+	union {
+		uint32_t words[16];
+		uint8_t bytes[64];
+	} out; // assure the uint32_t alignment
+	memcpy(out.bytes, output, outputLength);
 	if (outputLength)
 		SET_BIT(SPI_USER(HSPI), SPI_USR_MOSI);
 	if (inputLength)
 		SET_BIT(SPI_USER(HSPI), SPI_USR_MISO);
-	SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, outputLength*8);
-	SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, inputLength*8);
+	ASSERT_LOG( outputLength < 64);
+	ASSERT_LOG( inputLength < 64);
+	SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, (outputLength*8)-1);
+	SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, (inputLength*8)-1);
+//	LOGF(" SPI_USER : %X ", *(volatile uint32_t *)(SPI_USER(HSPI)));
+//	LOGF(" SPI_USER1 : %X ", *(volatile uint32_t *)(SPI_USER1(HSPI)));
+	for (int i = 0; i < 16; i++) {
+		volatile uint32_t* ptr = &SPI1W0;
+		*(ptr + i) = 0xAABBCCDD;
+	}
+
 	// txf data to buffers
-    volatile uint32_t * fifoPtr = &SPI1W0;
-    uint8_t dataSize = ((outputLength + 3) / 4);
+	volatile uint32_t * fifoPtr = &SPI1W0;
+	uint8_t dataSize = ((outputLength + 3) / 4);
 
-    if(outputLength) {
-        uint32_t * dataPtr = (uint32_t*) output;
-        while(dataSize--) {
-            *fifoPtr = *dataPtr;
-            dataPtr++;
-            fifoPtr++;
-        }
-    } else {
-        // no out data only read fill with dummy data!
-        while(dataSize--) {
-            *fifoPtr = 0xFFFFFFFF;
-            fifoPtr++;
-        }
-    }
+	if (outputLength) {
+		uint32_t * dataPtr = out.words;
+		while (dataSize--) {
+			*fifoPtr = *dataPtr;
+			dataPtr++;
+			fifoPtr++;
+		}
+	} else {
+		// no out data only read fill with dummy data!
+		while (dataSize--) {
+			*fifoPtr = 0xAABBCCDD;
+			fifoPtr++;
+		}
+	}
+	uint32_t* reg = (uint32_t*) SPI_W0(HSPI);
+	LOGF(" SPI_W0 %d out : %X %X %X %X %X",outputLength,
+			*reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
 
-    SET_BIT(SPI_CMD(HSPI), SPI_USR);
+//	cs_select();
+	SET_BIT(SPI_CMD(HSPI), SPI_USR);
 	// txf data from buffers
 	while (READ_PERI_REG(SPI_CMD(HSPI)) & SPI_USR)
 		// wait ready
 		;
-    if(inputLength) {
-        volatile uint8_t * fifoPtr8 = (volatile uint8_t *) &SPI1W0;
-        dataSize = inputLength;
-        while(dataSize--) {
-            *input = *fifoPtr8;
-            input++;
-            fifoPtr8++;
-        }
-    }
+//	cs_deselect();
+	if (inputLength) {
+		volatile uint8_t * fifoPtr8 = (volatile uint8_t *) &SPI1W0;
+		dataSize = inputLength;
+		while (dataSize--) {
+			*input = *fifoPtr8;
+			input++;
+			fifoPtr8++;
+		}
+	}
+	LOGF(" SPI_W0 %d in  : %X %X %X %X %X",inputLength,
+			*reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
 
 }
 
@@ -330,7 +402,7 @@ void Spi::clock(uint16 prediv, uint8 cntdiv) {
 #include <Arduino.h>
 #include <gpio_c.h>
 
-ICACHE_RAM_ATTR void Spi::set_hw_cs(bool use) {
+ void Spi::set_hw_cs(bool use) {
 	if (use) {
 		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 		//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
@@ -341,11 +413,11 @@ ICACHE_RAM_ATTR void Spi::set_hw_cs(bool use) {
 	}
 }
 // D8 == GPIO PIN 15
-ICACHE_RAM_ATTR void Spi::cs_select() {
+ void Spi::cs_select() {
 	digitalWrite(D8, 0);
 }
 
-ICACHE_RAM_ATTR void Spi::cs_deselect() {
+ void Spi::cs_deselect() {
 	digitalWrite(D8, 1);
 }
 
@@ -432,7 +504,7 @@ void Spi::rx_byte_order(uint8 byte_order) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-ICACHE_RAM_ATTR uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data,
+ uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data,
 		uint32 addr_bits, uint32 addr_data, uint32 dout_bits, uint32 dout_data,
 		uint32 din_bits, uint32 dummy_bits) {
 
@@ -650,19 +722,14 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff,
+extern "C"  int writetospi(uint16 hLen, const uint8 *hbuff,
 		uint32 bLen, const uint8 *buffer) {
 
-	uint32_t i;
-	Spi spi(HSPI);
-	spi.set_hw_cs(false);
-	spi.cs_select();
-	for (i = 0; i < hLen; i++)
-		spi.transaction(8, hbuff[i], 0, 0, 0, 0, 0, 0);
-	for (i = 0; i < bLen; i++)
-		spi.transaction(8, buffer[i], 0, 0, 0, 0, 0, 0);
-	ets_delay_us(100);
-	spi.cs_deselect();
+	uint8_t output[64];
+	ASSERT_LOG((hLen+bLen)<64);
+	memcpy(output, hbuff, hLen);
+	memcpy(output + hLen, buffer, bLen);
+	Spi::gSpi1->txf(output, hLen + bLen, output, 0);
 	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////////
@@ -671,20 +738,9 @@ extern "C" ICACHE_RAM_ATTR int writetospi(uint16 hLen, const uint8 *hbuff,
 //
 /////////////////////////////////////////////////////////////////////////////////
 
-extern "C" int ICACHE_RAM_ATTR readfromspi(uint16 hLen, const uint8 *hbuff,
+extern "C" int  readfromspi(uint16 hLen, const uint8 *hbuff,
 		uint32 bLen, uint8 *buffer) {
-	uint32_t i;
-//	LOGF("head : %s", bytesToHex(hbuff, hLen));
-	Spi spi(1);
-	spi.set_hw_cs(false);
-	spi.cs_select();
-	for (i = 0; i < hLen; i++)
-		spi.transaction(0, 0, 0, 0, 8, hbuff[i], 0, 0);
-	for (i = 0; i < bLen; i++)
-		buffer[i] = spi.transaction(0, 0, 0, 0, 0, 0, 8, 0);
-	ets_delay_us(10);
-	spi.cs_deselect();
-//	LOGF("data : %s", bytesToHex(buffer, bLen));
+	Spi::gSpi1->txf((uint8_t*)hbuff, hLen , buffer, bLen);
 	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////////
@@ -693,7 +749,19 @@ extern "C" int ICACHE_RAM_ATTR readfromspi(uint16 hLen, const uint8 *hbuff,
 //
 /////////////////////////////////////////////////////////////////////////////////
 void Spi::set_rate_low() {
-	clock(SPI_CLK_PREDIV, 20);
+	//------------------------------------------------------ SPI_CLOCK
+
+	CLEAR(SPI_CLOCK(HSPI));
+	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 4);
+	// was 4
+	// divide by 5 ( N+1 )
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 15);
+	// 3F max ==
+	// count to 16
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 8);
+	// 14-7 is high ticks
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 0);
+	// http://d.av.id.au/blog/hardware-spi-clock-registers should give 1MHz
 }
 //////////////////////////////////////////////////////////////////////////////////
 //
@@ -701,7 +769,16 @@ void Spi::set_rate_low() {
 //
 /////////////////////////////////////////////////////////////////////////////////
 void Spi::set_rate_high() {
-	clock(SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
+	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 0);
+	//
+	// divide by 1 ( N+1 )
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 7);
+	// 3F max ==
+	// count to 16
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_H, 4);
+	// 14-7 is high ticks
+	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_L, 0);
+
 }
 
 /*//////////////////////////////////////////////////////////////////////////////*/

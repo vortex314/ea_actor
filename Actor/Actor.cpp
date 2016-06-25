@@ -37,6 +37,17 @@ char sEvent[20];
 Cbor Actor::_cborOut(256);
 Cbor Actor::_cborIn(256);
 
+char* strcat(char *dst, const char* src) {
+	while (*dst)
+		dst++;
+	while (*src) {
+		*dst = *src;
+		dst++;
+		src++;
+	}
+	return dst;
+}
+
 const char* Actor::eventToString(uint8_t event) {
 	if (event & 0x80) {
 		strcpy(sEvent, "REPLY(");
@@ -78,7 +89,7 @@ Header& Header::src(ActorRef src) {
 	return *this;
 }
 
-ActorRef Header::src(){
+ActorRef Header::src() {
 	return ActorRef(_src);
 }
 
@@ -87,7 +98,7 @@ Header& Header::dst(ActorRef dst) {
 	return *this;
 }
 
-ActorRef Header::dst(){
+ActorRef Header::dst() {
 	return ActorRef(_dst);
 }
 
@@ -275,12 +286,12 @@ void Actor::eventLoop() {
 			if (Actor::_actors[i]->subscribed(hdr)) {
 				_cborIn.offset(0);
 				_cborOut.clear();
-/*				LOGF("event %s => {%s,%d,%d} => %s ",
-						Actor::idxToPath(hdr._src), //
-						Actor::eventToString(hdr._event),//
-						hdr._detail,//
-						_cborIn.length(),//
-						Actor::_actors[i]->path());*/
+				/*				LOGF("event %s => {%s,%d,%d} => %s ",
+				 Actor::idxToPath(hdr._src), //
+				 Actor::eventToString(hdr._event),//
+				 hdr._detail,//
+				 _cborIn.length(),//
+				 Actor::_actors[i]->path());*/
 				Actor::byIndex(i).onReceive(hdr, _cborIn);
 			}
 		}
@@ -333,11 +344,11 @@ bool ActorRef::equal(ActorRef ref) {
 	return _idx == ref._idx;
 }
 
-bool ActorRef::operator==(ActorRef ref){
+bool ActorRef::operator==(ActorRef ref) {
 	return ref._idx == _idx;
 }
 
-bool ActorRef::operator!=(ActorRef ref){
+bool ActorRef::operator!=(ActorRef ref) {
 	return ref._idx != _idx;
 }
 

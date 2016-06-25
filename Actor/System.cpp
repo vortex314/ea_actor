@@ -93,39 +93,47 @@ void testMode(int);
 
  */
 
-
-
-
-union {
-	uint32_t forAlignment;
-	uint8_t data[20];
-} input, output;
+uint8_t input[64];
 uint8_t writeEuid[] = { 0x81, 0x01, 0x03, 0x05, 0x07, 0x11, 0x13, 0x17, 0x23 };
 uint8_t readEuid[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
+uint8_t readDevid[] = { 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+/* Spi spi(HSPI);
 void testSPI() {
-	Spi spi(HSPI);
+
 //	pinMode(D8, OUTPUT);
-	spi.dwmInit();
 
-	memcpy(output.data, writeEuid, sizeof(writeEuid));
+	for (int i = 0; i < 1; i++) {
+//		spi._highestBitFirst= ((i&1)==1);
+//		spi._highestByteFirst = ( (i&2)==2);
+		LOGF(" mode : %d ", i);
+		spi._mode = i;
+		spi.dwmInit();
 
-	spi.txf(output.data,sizeof(writeEuid),input.data,0);
-	Serial.print(" write ");
-	for (int i = 0; i < sizeof(writeEuid); i++)
-		Serial.printf("%X,", input.data[i]);
-	Serial.println();
+		delay(10);
+//		spi.dwmFullSpeed();
 
-	memcpy(output.data, readEuid, sizeof(readEuid));
-	spi.txf(output.data,1,input.data,sizeof(readEuid)-1);
+		spi.txf(readDevid, 1, input, sizeof(readDevid) - 1);
+		Serial.print(" read dev id  ");
+		for (int i = 0; i < sizeof(readDevid); i++)
+			Serial.printf("%X,", input[i]);
+		Serial.println();
 
-	Serial.printf("  read ");
-	for (int i = 0; i < sizeof(readEuid); i++)
-		Serial.printf("%X,", output.data[i]);
-	Serial.println();
+		spi.txf(writeEuid, sizeof(writeEuid), input, 0);
+		Serial.print(" write ");
+		for (int i = 0; i < sizeof(writeEuid); i++)
+			Serial.printf("%X,", input[i]);
+		Serial.println();
 
+		spi.txf(readEuid, 1, input, sizeof(readEuid) - 1);
+		Serial.printf("  read ");
+		for (int i = 0; i < sizeof(readEuid); i++)
+			Serial.printf("%X,", input[i]);
+		Serial.println();
+	}
 
-}
+}*/
 
 //___________________________________________________
 //
@@ -135,7 +143,8 @@ bool System::subscribed(Header hdr) {
 }
 
 void System::init() {
-
+//	spi.dwmInit();
+//	spi.dwmReset();
 }
 
 void System::publish(uint8_t qos, const char* key, Str& value) {
@@ -152,13 +161,13 @@ void System::onReceive(Header hdr, Cbor& data) {
 		_mqttConnected = false;
 		return;
 	} else if (hdr.is(INIT)) {
-		setReceiveTimeout(10000);
+		setReceiveTimeout(1000);
 		init();
 		return;
 	};
 	switch (hdr._event) {
 	case TIMEOUT: {
-		testSPI();
+//		testSPI();
 		setReceiveTimeout(2000);
 		json.clear();
 		json.add(true);

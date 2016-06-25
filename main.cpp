@@ -45,7 +45,7 @@ extern "C" void setup(void) {
 #ifdef TAG
 	dwm1000 = DWM1000_Tag::create(mqtt);
 #endif
-#ifdef ANCHOR1
+#ifdef ANCHOR
 	dwm1000 = DWM1000_Anchor::create(mqtt);
 #endif
 	System::create(mqtt);

@@ -156,17 +156,6 @@ ActorRef DWM1000_Anchor::create(ActorRef mqtt) {
 
 DWM1000_Anchor::~DWM1000_Anchor() {
 }
-//_________________________________________________ HARd RESEST DWM1000_Anchor via PIN
-//
-void DWM1000_Anchor::resetChip() {
-	LOGF( " Reset DWM1000_Anchor ");
-	int pin = D1; // RESET PIN == D1 == GPIO5
-	pinMode(pin, 1); // OUTPUT
-	delay(10);
-	digitalWrite(pin, 0); // PULL LOW
-	delay(10); // 10ms
-	digitalWrite(pin, 1); // PUT HIGH
-}
 //_________________________________________________ IRQ handler
 //
 
@@ -197,30 +186,9 @@ void DWM1000_Anchor::enableIsr() {
 //
 void DWM1000_Anchor::initSpi() {
 	LOGF( "Init SPI ");
-	Spi spi(HSPI);
-	spi.init();
-	spi.mode(0, 0);
-//	spi.clock(HSPI, SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
-	spi.clock(10, 20); //
-//	spi.tx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
-//	spi.rx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
-	spi.tx_byte_order(SPI_BYTE_ORDER_LOW_TO_HIGH);
-	spi.rx_byte_order(SPI_BYTE_ORDER_LOW_TO_HIGH);
-	spi.set_bit_order(0);
-	WRITE_PERI_REG(SPI_CTRL2(HSPI), 0xFFFFFFFF);
-
-	WRITE_PERI_REG(SPI_CTRL2(HSPI),
-			(( 0xF & SPI_CS_DELAY_NUM ) << SPI_CS_DELAY_NUM_S) | //
-			(( 0x1 & SPI_CS_DELAY_MODE) << SPI_CS_DELAY_MODE_S) |//
-			(( 0xF & SPI_SETUP_TIME )<< SPI_SETUP_TIME_S ) |//
-			(( 0xF & SPI_HOLD_TIME )<< SPI_HOLD_TIME_S ) |//
-			(( 0xF & SPI_CK_OUT_LOW_MODE )<< SPI_CK_OUT_LOW_MODE_S ) |//
-			(( 0xF & SPI_CK_OUT_HIGH_MODE )<< SPI_CK_OUT_HIGH_MODE_S ) |//
-			(( 0x7 & SPI_MOSI_DELAY_NUM ) << SPI_MOSI_DELAY_NUM_S) |//
-			(( 0x7 & SPI_MISO_DELAY_NUM ) << SPI_MISO_DELAY_NUM_S) |//
-			(( 0x1 & SPI_MOSI_DELAY_MODE )<< SPI_MOSI_DELAY_MODE_S ) |//
-			(( 0x1 & SPI_MISO_DELAY_MODE )<< SPI_MISO_DELAY_MODE_S ) |//
-			0);
+	Spi& spi = *Spi::gSpi1;
+	spi.dwmReset();
+	spi.dwmInit();
 }
 
 void DWM1000_Anchor::txcallback(const dwt_callback_data_t * data) {
@@ -231,25 +199,25 @@ void DWM1000_Anchor::init() {
 //_________________________________________________INIT SPI ESP8266
 
 
-
-
-	resetChip();
 	LOGF(" IRQ pin : %d ", digitalRead(D2));
 	initSpi();
 	enableIsr();
+
+	uint32_t device_id = dwt_readdevid();
+	uint32_t part_id = dwt_getpartid();
+	uint32_t lot_id = dwt_getlotid();
+
+	LOGF( " device id : %X, part id :%X, lot_id :%X",
+			device_id, part_id, lot_id);
 
 	while (true) {
 		uint64_t eui = 0xF1F2F3F4F5F6F7F;
 		dwt_seteui((uint8_t*) &eui);
 		dwt_geteui((uint8_t*) &eui);
-		LOGF( "EUID : %ld", eui);
 		ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F);
-		dwt_seteui((uint8_t*) &eui);
-		dwt_geteui((uint8_t*) &eui);
-		LOGF( "EUID : %lX", eui);
-		delay(2000);
 		if (eui == 0xF1F2F3F4F5F6F7F)
 			break;
+		delay(2000);
 	}
 
 //	dwt_softreset();
@@ -264,9 +232,9 @@ void DWM1000_Anchor::init() {
 	} else
 		LOGF( " dwt_configure done.");
 
-	uint32_t device_id = dwt_readdevid();
-	uint32_t part_id = dwt_getpartid();
-	uint32_t lot_id = dwt_getlotid();
+	 device_id = dwt_readdevid();
+	 part_id = dwt_getpartid();
+	 lot_id = dwt_getlotid();
 
 	LOGF( " device id : %X, part id :%X, lot_id :%X",
 			device_id, part_id, lot_id);
@@ -472,7 +440,6 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 		setReceiveTimeout(1000);
 		return;
 	};
-	LOGF("");
 	uint64_t end_time = millis() + 10;
 	publish();
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO);
