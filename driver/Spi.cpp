@@ -95,7 +95,7 @@ void Spi::dwmInit() { // POL/PHA
 	//------------------------------------------------------ SPI_CLOCK
 
 	CLEAR(SPI_CLOCK(HSPI));
-	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 4);
+	SET(SPI_CLOCK(HSPI), SPI_CLKDIV_PRE, 8);
 	// was 4
 	// divide by 5 ( N+1 )
 	SET(SPI_CLOCK(HSPI), SPI_CLKCNT_N, 15);
@@ -166,13 +166,13 @@ void Spi::dwmInit() { // POL/PHA
 	CLEAR(SPI_CTRL2(HSPI));
 	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_NUM, 0);
 	SET(SPI_CTRL2(HSPI), SPI_CS_DELAY_MODE, 1);
-	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_NUM, 0);
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_NUM, 0); // was 0
 	// delay before MISO
-	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_MODE, 1);
+	SET(SPI_CTRL2(HSPI), SPI_MOSI_DELAY_MODE, 1); // was 1
 	//
-	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_NUM, 0);
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_NUM, 0); // was 0
 	// delay before MISO
-	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_MODE, 1);
+	SET(SPI_CTRL2(HSPI), SPI_MISO_DELAY_MODE, 1); // was 1
 	// sys or spi ticks
 
 	SET(SPI_CTRL2(HSPI), SPI_CK_OUT_HIGH_MODE, SPI_CK_OUT_HIGH_MODE);
@@ -185,7 +185,7 @@ void Spi::dwmInit() { // POL/PHA
 	// set max setup time
 //	LOGF(" SPI_CTRL2 : %X ",*(volatile uint32_t*)SPI_CTRL2(HSPI));
 
-	/*	WRITE_PERI_REG(SPI_CTRL2(HSPI),
+/*		WRITE_PERI_REG(SPI_CTRL2(HSPI),
 	 (( 0xF & SPI_CS_DELAY_NUM ) << SPI_CS_DELAY_NUM_S) | //
 	 (( 0x1 & SPI_CS_DELAY_MODE) << SPI_CS_DELAY_MODE_S) |//
 	 (( 0xF & SPI_SETUP_TIME )<< SPI_SETUP_TIME_S ) |//
@@ -200,26 +200,40 @@ void Spi::dwmInit() { // POL/PHA
 //		LOGF(" SPI_CTRL2 : %X ",*(volatile uint32_t*)SPI_CTRL2(HSPI));
 }
 
+#define MAGIC 0x11111111
+
 void Spi::txf(uint8_t* output, uint8_t outputLength, uint8_t* input,
 		uint8_t inputLength) {
 	union {
 		uint32_t words[16];
 		uint8_t bytes[64];
 	} out; // assure the uint32_t alignment
-	memcpy(out.bytes, output, outputLength);
-	if (outputLength)
+	if (outputLength) {
+		for (int i = 0; i < 16; i++) {
+			out.words[i] = MAGIC;
+		}
+		memcpy(out.bytes, output, outputLength);
 		SET_BIT(SPI_USER(HSPI), SPI_USR_MOSI);
-	if (inputLength)
+		SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, (outputLength*8)-1);
+	} else {
+		CLR_BIT(SPI_USER(HSPI), SPI_USR_MOSI);
+		SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, 0);
+	}
+	if (inputLength) {
 		SET_BIT(SPI_USER(HSPI), SPI_USR_MISO);
+		SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, (inputLength*8)-1);
+	} else {
+		CLR_BIT(SPI_USER(HSPI), SPI_USR_MISO);
+		SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, 0);
+	}
 	ASSERT_LOG( outputLength < 64);
 	ASSERT_LOG( inputLength < 64);
-	SET(SPI_USER1(HSPI), SPI_USR_MOSI_BITLEN, (outputLength*8)-1);
-	SET(SPI_USER1(HSPI), SPI_USR_MISO_BITLEN, (inputLength*8)-1);
+
 //	LOGF(" SPI_USER : %X ", *(volatile uint32_t *)(SPI_USER(HSPI)));
 //	LOGF(" SPI_USER1 : %X ", *(volatile uint32_t *)(SPI_USER1(HSPI)));
 	for (int i = 0; i < 16; i++) {
 		volatile uint32_t* ptr = &SPI1W0;
-		*(ptr + i) = 0xAABBCCDD;
+		*(ptr + i) = MAGIC;
 	}
 
 	// txf data to buffers
@@ -236,13 +250,14 @@ void Spi::txf(uint8_t* output, uint8_t outputLength, uint8_t* input,
 	} else {
 		// no out data only read fill with dummy data!
 		while (dataSize--) {
-			*fifoPtr = 0xAABBCCDD;
+			*fifoPtr = MAGIC;
 			fifoPtr++;
 		}
 	}
 	uint32_t* reg = (uint32_t*) SPI_W0(HSPI);
-	LOGF(" SPI_W0 %d out : %X %X %X %X %X",outputLength,
-			*reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
+//	LOGF(" SPI_W0 %d out : %08X %08X %08X %08X %08X",
+	//		outputLength, *reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
+
 
 //	cs_select();
 	SET_BIT(SPI_CMD(HSPI), SPI_USR);
@@ -260,11 +275,12 @@ void Spi::txf(uint8_t* output, uint8_t outputLength, uint8_t* input,
 			fifoPtr8++;
 		}
 	}
-	LOGF(" SPI_W0 %d in  : %X %X %X %X %X",inputLength,
-			*reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
+//	LOGF(" SPI_W0 %d in  : %08X %08X %08X %08X %08X",
+	//		inputLength, *reg, *(reg+1), *(reg+2), *(reg+3), *(reg+4));
+//	LOGF("------------------------------------------------------------------");
 
 }
-
+/*
 void Spi::init() {
 	init_gpio(SPI_CLK_USE_DIV);
 	clock(SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
@@ -299,11 +315,7 @@ void Spi::mode(uint8 spi_cpha, uint8 spi_cpol) {
 		SET_PERI_REG_MASK(SPI_USER(_spi_no), SPI_CK_I_EDGE);
 	}
 
-	/*	if (spi_cpol) {
-	 SET_PERI_REG_MASK(SPI_PIN(spi_no), SPI_IDLE_EDGE);
-	 } else {
-	 CLEAR_PERI_REG_MASK(SPI_PIN(spi_no), SPI_IDLE_EDGE);
-	 }*/
+
 
 	if (spi_cpol) { // CPOL
 		SET_PERI_REG_MASK(SPI_CTRL2(_spi_no),
@@ -402,7 +414,7 @@ void Spi::clock(uint16 prediv, uint8 cntdiv) {
 #include <Arduino.h>
 #include <gpio_c.h>
 
- void Spi::set_hw_cs(bool use) {
+void Spi::set_hw_cs(bool use) {
 	if (use) {
 		PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTDO_U, 2);
 		//GPIO15 is HSPI CS pin (Chip Select / Slave Select)
@@ -413,11 +425,11 @@ void Spi::clock(uint16 prediv, uint8 cntdiv) {
 	}
 }
 // D8 == GPIO PIN 15
- void Spi::cs_select() {
+void Spi::cs_select() {
 	digitalWrite(D8, 0);
 }
 
- void Spi::cs_deselect() {
+void Spi::cs_deselect() {
 	digitalWrite(D8, 1);
 }
 
@@ -504,9 +516,9 @@ void Spi::rx_byte_order(uint8 byte_order) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
- uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data,
-		uint32 addr_bits, uint32 addr_data, uint32 dout_bits, uint32 dout_data,
-		uint32 din_bits, uint32 dummy_bits) {
+uint32 Spi::transaction(uint8 cmd_bits, uint16 cmd_data, uint32 addr_bits,
+		uint32 addr_data, uint32 dout_bits, uint32 dout_data, uint32 din_bits,
+		uint32 dummy_bits) {
 
 	ASSERT_LOG(_spi_no <= 1)
 
@@ -611,7 +623,7 @@ void Spi::rx_byte_order(uint8 byte_order) {
 
 	//Transaction completed
 	return 1; //success
-}
+}*/
 
 /**
  * Set bit order.
@@ -620,7 +632,7 @@ void Spi::rx_byte_order(uint8 byte_order) {
  * @see spiOrder_t
  * @return None
  */
-void Spi::set_bit_order(int order) {
+/*void Spi::set_bit_order(int order) {
 
 	if (!order) {
 		WRITE_PERI_REG(SPI_CTRL(_spi_no),
@@ -630,7 +642,7 @@ void Spi::set_bit_order(int order) {
 				READ_PERI_REG(SPI_CTRL(_spi_no)) | (SPI_WR_BIT_ORDER | SPI_RD_BIT_ORDER));
 	}
 
-}
+}*/
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -655,7 +667,7 @@ void Spi::set_bit_order(int order) {
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-void bytesToWords(uint32_t* pW, uint8_t* pB, uint32_t length) {
+/*void bytesToWords(uint32_t* pW, uint8_t* pB, uint32_t length) {
 	typedef union {
 		uint32_t word;
 		uint8_t bytes[4];
@@ -672,13 +684,13 @@ void bytesToWords(uint32_t* pW, uint8_t* pB, uint32_t length) {
 		}
 		pMap++;
 	}
-}
+}*/
 //////////////////////////////////////////////////////////////////////////////////
 //
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-void wordsToBytes(uint32_t* pW, uint8_t* pB, uint32_t length) {
+/*void wordsToBytes(uint32_t* pW, uint8_t* pB, uint32_t length) {
 	typedef union {
 		uint32_t word;
 		uint8_t bytes[4];
@@ -695,13 +707,13 @@ void wordsToBytes(uint32_t* pW, uint8_t* pB, uint32_t length) {
 		}
 		pMap++;
 	}
-}
+}*/
 //////////////////////////////////////////////////////////////////////////////////
 //
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-const char* HEX_CHAR = "0123456789ABCDEF";
+/*const char* HEX_CHAR = "0123456789ABCDEF";
 char line[128];
 
 char* bytesToHex(const uint8_t* pb, uint32_t len) {
@@ -716,15 +728,16 @@ char* bytesToHex(const uint8_t* pb, uint32_t len) {
 	}
 	line[offset++] = '\0';
 	return line;
-}
+}*/
 //////////////////////////////////////////////////////////////////////////////////
 //
 //
 //
 /////////////////////////////////////////////////////////////////////////////////
-extern "C"  int writetospi(uint16 hLen, const uint8 *hbuff,
-		uint32 bLen, const uint8 *buffer) {
+extern "C" int writetospi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
+		const uint8 *buffer) {
 
+//	LOGF(" header(%d) : %X %X %X buffer(%d) : %X %X %X ",hLen,hbuff [0],hbuff [1],hbuff [2],bLen,buffer [0],buffer [1],buffer[2]);
 	uint8_t output[64];
 	ASSERT_LOG((hLen+bLen)<64);
 	memcpy(output, hbuff, hLen);
@@ -738,9 +751,10 @@ extern "C"  int writetospi(uint16 hLen, const uint8 *hbuff,
 //
 /////////////////////////////////////////////////////////////////////////////////
 
-extern "C" int  readfromspi(uint16 hLen, const uint8 *hbuff,
-		uint32 bLen, uint8 *buffer) {
-	Spi::gSpi1->txf((uint8_t*)hbuff, hLen , buffer, bLen);
+extern "C" int readfromspi(uint16 hLen, const uint8 *hbuff, uint32 bLen,
+		uint8 *buffer) {
+//	LOGF(" header(%d) : %X %X %X buffer(%d) : %X %X %X ",hLen,hbuff [0],hbuff [1],hbuff [2],bLen,buffer [0],buffer [1],buffer[2]);
+	Spi::gSpi1->txf((uint8_t*) hbuff, hLen, buffer, bLen);
 	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////////
@@ -781,44 +795,3 @@ void Spi::set_rate_high() {
 
 }
 
-/*//////////////////////////////////////////////////////////////////////////////*/
-/*	uint32_t din_bits = hLen * 8;
- uint32_t dout_bits = bLen * 8;
-
- while (spi_busy(HSPI))
- ; //wait for SPI to be ready
-
- //########## Enable SPI Functions ##########//
- //disable MOSI, MISO, ADDR, COMMAND, DUMMY in case previously set.
- CLEAR_PERI_REG_MASK(SPI_USER(HSPI),
- SPI_USR_MOSI|SPI_USR_MISO|SPI_USR_COMMAND|SPI_USR_ADDR|SPI_USR_DUMMY);
- SET_PERI_REG_MASK(SPI_USER(HSPI), SPI_DOUTDIN); // LMR set full duplex
- SET_PERI_REG_MASK(SPI_USER(HSPI), SPI_USR_MISO); //enable MISO function in SPI module
- SET_PERI_REG_MASK(SPI_USER(HSPI), SPI_USR_MOSI); //enable MOSI function in SPI module
-
- //########## Setup Bitlengths ##########//
- WRITE_PERI_REG(SPI_USER1(HSPI),
- ((dout_bits-1)&SPI_USR_MOSI_BITLEN)<<SPI_USR_MOSI_BITLEN_S | //Number of bits to Send
- ((din_bits-1)&SPI_USR_MISO_BITLEN)<<SPI_USR_MISO_BITLEN_S);//Number of bits to receive
-
- //########## Setup DOUT data ##########//
- if (dout_bits) {
- //copy data to W0
- uint32_t offset = bytesToWord(SPI_W0(HSPI), hbuff, hLen);
- bytesToWord(SPI_W0(HSPI), buffer,bLen);
- }
-
- SET_PERI_REG_MASK(SPI_CMD(HSPI), SPI_USR); //########## Begin SPI Transaction ##########//
-
- //########## Return DIN data ##########//
- wordsToBytes(SPI_W0(HSPI),);
- if (din_bits) {
- while (spi_busy(HSPI))
- ;	//wait for SPI transaction to complete
-
- if (READ_PERI_REG(SPI_USER(HSPI)) & SPI_RD_BYTE_ORDER) {
- return READ_PERI_REG(SPI_W0(HSPI)) >> (32 - din_bits); //Assuming data in is written to MSB. TBC
- } else {
- return READ_PERI_REG(SPI_W0(HSPI)); //Read in the same way as DOUT is sent. Note existing contents of SPI_W0 remain unless overwritten!
- }
- }*/

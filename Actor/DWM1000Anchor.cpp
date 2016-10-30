@@ -111,8 +111,8 @@ typedef unsigned long long uint64;
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.46 ms with above configuration. */
 #define POLL_RX_TO_RESP_TX_DLY_UUS 2600
-#define RESP_TX_TO_FINAL_RX_DLY_UUS 500 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-#define FINAL_RX_TIMEOUT_UUS 3300	/* Receive final timeout. See NOTE 5 below. */
+#define RESP_TX_TO_FINAL_RX_DLY_UUS 500 /* was 500 This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
+#define FINAL_RX_TIMEOUT_UUS 9000	/* was 3300 Receive final timeout. See NOTE 5 below. */
 
 /* Timestamps of frames transmission/reception.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -125,7 +125,7 @@ static uint64 final_rx_ts;
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
-/* Hold copies of computed time of flight and distance here for reference, so reader can examine it at a breakpoint. */
+/* Hold copies of com_intervalputed time of flight and distance here for reference, so reader can examine it at a breakpoint. */
 static double tof;
 static double distance;
 
@@ -198,7 +198,6 @@ void DWM1000_Anchor::init() {
 	LOGF("HSPI");
 //_________________________________________________INIT SPI ESP8266
 
-
 	LOGF(" IRQ pin : %d ", digitalRead(D2));
 	initSpi();
 	enableIsr();
@@ -215,13 +214,15 @@ void DWM1000_Anchor::init() {
 		dwt_seteui((uint8_t*) &eui);
 		dwt_geteui((uint8_t*) &eui);
 		ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F);
+		dwt_geteui((uint8_t*) &eui);
+		ASSERT_LOG( eui == 0xF1F2F3F4F5F6F7F);
 		if (eui == 0xF1F2F3F4F5F6F7F)
 			break;
-		delay(2000);
+		delay(1000);
 	}
 
 //	dwt_softreset();
-	deca_sleep(100);
+	delay(100);
 
 	if (dwt_initialise(DWT_LOADUCODE)) {
 		LOGF( " dwt_initialise failed ");
@@ -232,9 +233,9 @@ void DWM1000_Anchor::init() {
 	} else
 		LOGF( " dwt_configure done.");
 
-	 device_id = dwt_readdevid();
-	 part_id = dwt_getpartid();
-	 lot_id = dwt_getlotid();
+	device_id = dwt_readdevid();
+	part_id = dwt_getpartid();
+	lot_id = dwt_getlotid();
 
 	LOGF( " device id : %X, part id :%X, lot_id :%X",
 			device_id, part_id, lot_id);
@@ -242,7 +243,6 @@ void DWM1000_Anchor::init() {
 	/* Apply default antenna delay value. See NOTE 1 below. */
 	dwt_setrxantennadelay(RX_ANT_DLY);
 	dwt_settxantennadelay(TX_ANT_DLY);
-
 
 //	dwt_initialise(DWT_LOADUCODE);
 // Configure the callbacks from the dwt library
@@ -431,220 +431,54 @@ void DWM1000_Anchor::onReceive(Header hdr, Cbor& cbor) {
 
 	if (hdr.is(_mqtt, REPLY(CONNECT))) {
 		_mqttConnected = true;
+		LOGF(" MQTT connected.");
 		return;
 	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
 		_mqttConnected = false;
+		LOGF(" MQTT disconnected.");
 		return;
 	} else if (hdr.is(INIT)) {
 		init();
-		setReceiveTimeout(1000);
+		setReceiveTimeout(3000);
 		return;
-	};
-	uint64_t end_time = millis() + 10;
-	publish();
-	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO);
-	// clear timeout
-	dwt_setrxtimeout(0); /* Clear reception timeout to start next ranging process. */
-	dwt_rxenable(0); /* Activate reception immediately. */
-	clearInterrupt();
-	while (end_time > millis()) {
-		if (isInterruptDetected()) {
-			_pollsReceived++;
-			if (receivePollForAnchor()) {
-				_pollsForAnchor++;
-				sendReply();
-				_replySend++;
-				break;
-			}
-
-		}
-	};
-	if (isInterruptDetected()) {
-		clearInterrupt();
-		while (end_time > millis()) {
-			if (isInterruptDetected()) {
-				_finalReceived++;
-				if (receiveFinalForAnchor()) {
-					_finalForAnchor++;
-					calcDistance();
-				}
-			}
-
-		}
-	}
-	setReceiveTimeout(1);
-	return;
-
-	switch (state()) {
-	case S_START: {
+	} else if (hdr.is(TIMEOUT)) {
+		uint64_t end_time = millis() + 10;
 		publish();
 		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO);
 		// clear timeout
 		dwt_setrxtimeout(0); /* Clear reception timeout to start next ranging process. */
 		dwt_rxenable(0); /* Activate reception immediately. */
-		dwt_setinterrupt(DWT_INT_RFCG, 1); // enable RXD interrupt
-		setReceiveTimeout(10);/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-		state(S_POLL_WAIT);
-		break;
-	}
-	case S_POLL_WAIT: {
-		if (hdr.is(TIMEOUT)) {
-			setReceiveTimeout(10);
-			state(S_START);
+		clearInterrupt();
+		while (end_time > millis()) {
+			if (isInterruptDetected()) {
+				_pollsReceived++;
+				if (receivePollForAnchor()) {
+					_pollsForAnchor++;
+					sendReply();
+					_replySend++;
+					break;
+				}
+
+			}
+		};
+		if (isInterruptDetected()) {
+			clearInterrupt();
+			while (end_time > millis()) {
+				if (isInterruptDetected()) {
+					_finalReceived++;
+					if (receiveFinalForAnchor()) {
+						_finalForAnchor++;
+						calcDistance();
+					}
+				}
+
+			}
 		}
-		break;
+		setReceiveTimeout(1);
 	}
-	case S_FINAL_WAIT: {
-		if (hdr.is(TIMEOUT)) {
-			setReceiveTimeout(10);
-			state(S_START);
-		}
-		break;
-	}
+	return;
 
-	}
-	/*
-	 PT_BEGIN()
-	 while (true) {
 
-	 WAIT_POLL: {
-
-	 while (true) { // Poll for reception of a frame or error/timeout. See NOTE 7 below.
-	 publish();
-	 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO);
-	 // clear timeout
-	 dwt_setrxtimeout(0); // Clear reception timeout to start next ranging process.
-	 dwt_rxenable(0); // Activate reception immediately.
-	 dwt_setinterrupt(DWT_INT_RFCG, 1); // enable RXD interrupt
-	 setReceiveTimeout(1000);// This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature.
-
-	 PT_YIELD_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD));
-	 if (hdr.is(RXD)) {
-	 _pollsReceived++;
-	 _status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-	 break;
-	 }
-	 }
-	 }
-	 ///____________________________________________________________________________
-
-	 if (hdr.is(RXD)) {
-	 if (_mqttConnected)
-	 _mqtt.tell(self(), PUBLISH, 0,
-	 _cborOut.putf("ss", "dwm1000/status", "data received"));
-
-	 uint32 frame_len;
-	 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-	 // Clear good RX frame event in the DW1000 status register.
-	 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023; // A frame has been received, read it into the local buffer.
-	 if (frame_len <= RX_BUFFER_LEN) {
-	 dwt_readrxdata(rx_buffer, frame_len, 0);
-	 }
-	 //			LOGF(" frame_len : %d status_reg : %X",frame_len,_status_reg);
-
-	 // Check that the frame is a poll sent by "DS TWR initiator" example.
-	 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame.
-	 rx_buffer[ALL_MSG_SN_IDX] = 0;
-	 if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
-	 _pollsForAnchor++;
-	 uint32 resp_tx_time;
-
-	 poll_rx_ts = get_rx_timestamp_u64(); // Retrieve poll reception timestamp.
-
-	 // Set send time for response. See NOTE 8 below.
-	 resp_tx_time = (poll_rx_ts
-	 + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-	 dwt_setdelayedtrxtime(resp_tx_time);
-
-	 // Set expected delay and timeout for final message reception.
-	 dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-	 dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
-
-	 // Write and send the response message. See NOTE 9 below.
-	 tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-	 dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
-	 dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
-	 dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-	 _replySend++;
-
-	 setReceiveTimeout(10);
-	 dwt_setinterrupt(DWT_INT_RFCG, 1); // enable
-	 PT_YIELD_UNTIL(hdr.is(TIMEOUT) || hdr.is(RXD));
-	 // Increment frame sequence number after transmission of the response message (modulo 256).
-	 frame_seq_nb++;
-	 if (hdr.is(TIMEOUT)) {
-	 LOGF(" timeout on final ")
-	 goto WAIT_POLL;
-	 } else if (hdr.is(RXD)) {
-	 _mqtt.tell(self(), PUBLISH, 0,
-	 _cborOut.putf("ss", "dwm1000/status", "replied"));
-	 // Clear good RX frame event and TX frame sent in the DW1000 status register.
-	 dwt_write32bitreg(SYS_STATUS_ID,
-	 SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-	 // A frame has been received, read it into the local buffer.
-	 frame_len = dwt_read32bitreg(
-	 RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-	 if (frame_len <= RX_BUF_LEN) {
-	 dwt_readrxdata(rx_buffer, frame_len, 0);
-	 }
-
-	 // Check that the frame is a final message sent by "DS TWR initiator" example.
-	 // As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame.
-	 rx_buffer[ALL_MSG_SN_IDX] = 0;
-	 if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN)
-	 == 0) {
-	 _finalReceived++;
-	 uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
-	 uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
-	 double Ra, Rb, Da, Db;
-	 int64 tof_dtu;
-
-	 // Retrieve response transmission and final reception timestamps.
-	 resp_tx_ts = get_tx_timestamp_u64();
-	 final_rx_ts = get_rx_timestamp_u64();
-
-	 // Get timestamps embedded in the final message.
-	 final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX],
-	 &poll_tx_ts);
-	 final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX],
-	 &resp_rx_ts);
-	 final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX],
-	 &final_tx_ts);
-
-	 // Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 10 below.
-	 poll_rx_ts_32 = (uint32) poll_rx_ts;
-	 resp_tx_ts_32 = (uint32) resp_tx_ts;
-	 final_rx_ts_32 = (uint32) final_rx_ts;
-	 Ra = (double) (resp_rx_ts - poll_tx_ts);
-	 Rb = (double) (final_rx_ts_32 - resp_tx_ts_32);
-	 Da = (double) (final_tx_ts - resp_rx_ts);
-	 Db = (double) (resp_tx_ts_32 - poll_rx_ts_32);
-	 tof_dtu = (int64) ((Ra * Rb - Da * Db)
-	 / (Ra + Rb + Da + Db));
-
-	 tof = tof_dtu * DWT_TIME_UNITS;
-	 distance = tof * SPEED_OF_LIGHT;
-
-	 // Display computed distance on LCD.
-	 //						char dist_str[20];
-	 //						sprintf(dist_str,"%3.2f", distance);
-	 //                      lcd_display_str(dist_str);
-	 LOGF( " distance : %d m", (float) distance);
-	 }
-	 }
-	 } else {
-	 LOGF(" it's no poll msg ");
-	 }
-	 } else {
-	 LOGF(" it's no RXD ")
-	 goto WAIT_POLL;
-	 }
-
-	 }
-
-	 PT_END();
-	 */
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -717,7 +551,7 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
  *    but, in a real application, each device should have its own antenna delay properly calibrated to get the best possible precision when performing
  *    range measurements.
  * 2. The messages here are similar to those used in the DecaRanging ARM application (shipped with EVK1000 kit). They comply with the IEEE
- *    802.15.4 standard MAC data frame encoding and they are following the ISO/IEC:24730-62:2013 standard. The messages used are:
+ *    802.15.4 standard MAC data frame encoding and they ar2700e following the ISO/IEC:24730-62:2013 standard. The messages used are:
  *     - a poll message sent by the initiator to trigger the ranging exchange.
  *     - a response message sent by the responder allowing the initiator to go on with the process
  *     - a final message sent by the initiator to complete the exchange and provide all information needed by the responder to compute the

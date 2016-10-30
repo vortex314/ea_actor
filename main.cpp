@@ -8,13 +8,12 @@
 #include <LedBlinker.h>
 #include <Config.h>
 #include <pins_arduino.h>
-#include <DWM1000Anchor.h>
-#include <DWM1000Tag.h>
+
 #include <System.h>
 //#include <PubSubClient.h>
 
 ActorRef ledBlinker;
-ActorRef tcpClient;
+ActorRef tcpServer;
 ActorRef wifi;
 ActorRef mqtt;
 ActorRef mqttFramer;
@@ -32,27 +31,13 @@ extern "C" void setup(void) {
 
 	ledBlinker = LedBlinker::create(16);
 	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
-	tcpClient = TcpClient::create("iot.eclipse.org", 1883);
+	tcpServer = TcpServer::create(wifi,23);
 	mqttFramer = MqttFramer::create();
 	config = Config::create();
 
-#ifdef TAG
-#define MQTT_NAME "tag_1"
-#else
-#define MQTT_NAME "anchor_1"
-#endif
-	mqtt = Mqtt::create(mqttFramer,MQTT_NAME);
-#ifdef TAG
-	dwm1000 = DWM1000_Tag::create(mqtt);
-#endif
-#ifdef ANCHOR
-	dwm1000 = DWM1000_Anchor::create(mqtt);
-#endif
+
+	mqtt = Mqtt::create(mqttFramer,"stm32_1/");
 	System::create(mqtt);
-
-	wifi >> tcpClient >> mqttFramer >> mqtt >> ledBlinker;
-
-
 
 	Actor::broadcast(ActorRef(0), INIT, 0);
 

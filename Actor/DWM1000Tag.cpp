@@ -87,9 +87,9 @@ static uint8 rx_buffer[RX_BUF_LEN];
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150 // was 150
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 4600 // was 3100
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 2700
+#define RESP_RX_TIMEOUT_UUS 5000 // was 2700
 
 /* Time-stamps of frames transmission/reception, expressed in device time units.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -124,17 +124,6 @@ ActorRef DWM1000_Tag::create(ActorRef mqtt) {
 DWM1000_Tag::~DWM1000_Tag() {
 
 }
-//_________________________________________________ HARd RESEST DWM1000_Anchor via PIN
-//
-void DWM1000_Tag::resetChip() {
-	LOGF( " Reset DWM1000_Anchor ");
-	int pin = D1; // RESET PIN == D1 == GPIO5
-	pinMode(pin, 1); // OUTPUT
-	delay(10);
-	digitalWrite(pin, 0); // PULL LOW
-	delay(10); // 10ms
-	digitalWrite(pin, 1); // PUT HIGH
-}
 //_________________________________________________ IRQ handler
 //
 ICACHE_RAM_ATTR void DWM1000_Tag::my_dwt_isr() {
@@ -163,30 +152,9 @@ void DWM1000_Tag::enableIsr() {
 //
 void DWM1000_Tag::initSpi() {
 	LOGF( "Init SPI ");
-	Spi spi(HSPI);
-	spi.init();
-	spi.mode(0, 0);
-	//	spi.clock(HSPI, SPI_CLK_PREDIV, SPI_CLK_CNTDIV);
-	spi.clock(10, 20); //
-//	spi.tx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
-//	spi.rx_byte_order( SPI_BYTE_ORDER_HIGH_TO_LOW);
-	spi.tx_byte_order(SPI_BYTE_ORDER_LOW_TO_HIGH);
-	spi.rx_byte_order(SPI_BYTE_ORDER_LOW_TO_HIGH);
-	spi.set_bit_order(0);
-	WRITE_PERI_REG(SPI_CTRL2(HSPI), 0xFFFFFFFF);
-
-	WRITE_PERI_REG(SPI_CTRL2(HSPI),
-			(( 0xF & SPI_CS_DELAY_NUM ) << SPI_CS_DELAY_NUM_S) | //
-			(( 0x1 & SPI_CS_DELAY_MODE) << SPI_CS_DELAY_MODE_S) |//
-			(( 0xF & SPI_SETUP_TIME )<< SPI_SETUP_TIME_S ) |//
-			(( 0xF & SPI_HOLD_TIME )<< SPI_HOLD_TIME_S ) |//
-			(( 0xF & SPI_CK_OUT_LOW_MODE )<< SPI_CK_OUT_LOW_MODE_S ) |//
-			(( 0xF & SPI_CK_OUT_HIGH_MODE )<< SPI_CK_OUT_HIGH_MODE_S ) |//
-			(( 0x7 & SPI_MOSI_DELAY_NUM ) << SPI_MOSI_DELAY_NUM_S) |//
-			(( 0x7 & SPI_MISO_DELAY_NUM ) << SPI_MISO_DELAY_NUM_S) |//
-			(( 0x1 & SPI_MOSI_DELAY_MODE )<< SPI_MOSI_DELAY_MODE_S ) |//
-			(( 0x1 & SPI_MISO_DELAY_MODE )<< SPI_MISO_DELAY_MODE_S ) |//
-			0);
+	Spi& spi = *Spi::gSpi1;
+	spi.dwmReset();
+	spi.dwmInit();
 }
 //___________________________________________________
 //
@@ -200,7 +168,6 @@ void DWM1000_Tag::init() {
 	LOGF("HSPI");
 //_________________________________________________INIT SPI ESP8266
 
-	resetChip();
 	LOGF(" IRQ pin : %d ", digitalRead(D2));
 	initSpi();
 	enableIsr();
@@ -376,38 +343,33 @@ void DWM1000_Tag::onRxCallback() {
 
 void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 	if (hdr.is(_mqtt, REPLY(CONNECT))) { // STATE independent message handling
+		LOGF(" MQTT connected ");
 		_mqttConnected = true;
 		return;
 	} else if (hdr.is(_mqtt, REPLY(DISCONNECT))) {
 		_mqttConnected = false;
+		LOGF(" MQTT disconnected ");
 		return;
 	} else if (hdr.is(INIT)) {
 		init();
-		setReceiveTimeout(1000); // delay  between POLL
+		setReceiveTimeout(3000); // delay  between POLL
 		state(S_START);
-	}
+	} else if (hdr.is(TIMEOUT)) {
+		publish();
+		uint64_t end_time = millis() + 10;
+		uint32_t status_reg = 0;
 
-	switch (state()) { // STATE dependent message handling
-	case S_START: {
-		if (hdr.is(TIMEOUT)) {
+		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
 
-			publish();
-			uint64_t end_time = millis() + 10;
-			uint32_t status_reg;
+		dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+		sendPoll();
+		_pollsSend++;
+		while ((millis() < end_time) && ((status_reg & SYS_STATUS_RXFCG) == 0)) {
+			status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+		}
 
-            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
-
-			dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
-			sendPoll();
-			_pollsSend++;
-			while ((millis() < end_time)
-					&& ((status_reg & SYS_STATUS_RXFCG) == 0)) {
-				status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-			}
-
-			if (millis() >= end_time)
-				break;
+		if ((status_reg & SYS_STATUS_RXFCG)) {
 			_replyReceived++;
 			if (receiveReplyForTag()) {
 				_replyForTag++;
@@ -415,23 +377,9 @@ void DWM1000_Tag::onReceive(Header hdr, Cbor& cbor) {
 				_finalSend++;
 				state(S_START);
 			}
-
-
-			setReceiveTimeout(10); // delay  between POLL
-
 		}
-		break;
+		setReceiveTimeout(1); // delay  between POLL
 	}
-	case S_REPLY_WAIT: {
-		if (hdr.is(TIMEOUT)) {
-			setReceiveTimeout(10);
-			state(S_START);
-		}
-		break;
-	}
-
-	}
-	return;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
