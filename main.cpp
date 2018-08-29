@@ -30,7 +30,7 @@ extern "C" void setup(void) {
 	Actor::setup();
 
 	ledBlinker = LedBlinker::create(16);
-	wifi = Wifi::create("Merckx", "LievenMarletteEwoutRonald");
+	wifi = Wifi::create(SSID, PSWD);
 	tcpServer = TcpServer::create(wifi,23);
 	mqttFramer = MqttFramer::create();
 	config = Config::create();
